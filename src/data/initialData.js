@@ -1,24 +1,45 @@
 // src/data/initialData.js
-// Zero Factory Presets: All user collections initialize as empty arrays ([])
+// Calibrated to "Dans Health Journey.md" operational constraints
 
-export const DEFAULT_MORNING_STACKS = [];
+import { DANS_MORNING_STACK } from '../utils/nutrientEngine';
 
-export const DEFAULT_WORKOUT_PRESETS = [];
+export const DEFAULT_MORNING_STACKS = [DANS_MORNING_STACK];
+
+export const DEFAULT_WORKOUT_PRESETS = [
+  { id: 'w_bands', name: 'Resistance Bands (Back/V-Taper, Chest, Biceps)', durationMin: 40, steps: 1200, caloriesBurned: 240 },
+  { id: 'w_abwheel', name: 'Ab Wheel Core Tension', durationMin: 15, steps: 300, caloriesBurned: 95 },
+  { id: 'w_spin', name: 'Stationary Spin Bike (Zone 2/3)', durationMin: 35, steps: 4200, caloriesBurned: 320 },
+];
 
 export const DEFAULT_WORKOUT_REMINDERS = [];
 
-export const INITIAL_PEPTIDE_HISTORY = [];
+export const INITIAL_PEPTIDE_HISTORY = [
+  {
+    id: 'pep_reta_weekly',
+    category: 'PEPTIDE',
+    title: 'Retatrutide',
+    name: 'Retatrutide',
+    doseMg: 3.0,
+    doseMcg: 3000,
+    vialMg: 10,
+    bacWaterMl: 2,
+    units: 60,
+    site: 'SubQ Periumbilical (Weekly)',
+    summary: '3 mg (3000 mcg) • 60 IU (10mg vial + 2mL BAC) • Weekly Protocol',
+    timestamp: new Date().toISOString(),
+  },
+];
 
 export const DAILY_TARGETS = {
-  calories: 2200,
-  protein: 140, // g
-  carbs: 200, // g
-  fat: 75, // g
-  waterMl: 2500, // ml (default target with inline editable pencil icon)
+  calories: 1900, // 1,850-1,950 kcal/day (preserve facial fat pads & lean tissue)
+  protein: 180, // 170-190 g/day
+  carbs: 145, // g
+  fat: 65, // g
+  waterMl: 2500, // ml
   steps: 10000,
   activeMinutes: 45,
-  leucineTarget: 2.0, // g (ceiling/threshold for mTORC1 stimulation)
-  methionineSafetyCeiling: 1.8, // g (safety ceiling for NHL remission)
+  leucineTarget: 2.5, // g
+  methionineSafetyCeiling: 1.8, // g (NHL remission safeguard)
 };
 
 export const ESSENTIAL_AMINO_ACIDS = [

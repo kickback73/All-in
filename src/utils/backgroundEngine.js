@@ -15,7 +15,7 @@ export const AVAILABLE_BACKGROUND_IMAGES = [
  * Selects `count` unique background images at random from `/public/images/`.
  * Does not repeat images across tiles unless the directory contains fewer images than tiles.
  */
-export function selectUniqueTileBackgrounds(count = 4, pool = AVAILABLE_BACKGROUND_IMAGES) {
+export function selectUniqueTileBackgrounds(count = 6, pool = AVAILABLE_BACKGROUND_IMAGES) {
   const source = Array.isArray(pool) && pool.length > 0 ? [...pool] : [...AVAILABLE_BACKGROUND_IMAGES];
 
   // Fisher-Yates shuffle for unbiased non-duplicating random selection
@@ -36,7 +36,6 @@ export function selectUniqueTileBackgrounds(count = 4, pool = AVAILABLE_BACKGROU
  * At 12:01 AM local time, this key shifts and triggers a daily reset of all daily summary counters.
  */
 export function getActiveCycleDateKey(now = new Date()) {
-  // Shift by 1 minute so 00:00:00 - 00:00:59 belongs to previous cycle, 00:01:00 begins new day
   const adjusted = new Date(now.getTime() - 60 * 1000);
   const year = adjusted.getFullYear();
   const month = String(adjusted.getMonth() + 1).padStart(2, '0');
