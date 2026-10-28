@@ -2,23 +2,23 @@
 // Non-duplicating randomized tile background engine and 12:01 AM daily reset logic
 
 export const AVAILABLE_BACKGROUND_IMAGES = [
-  '/images/hero_power.jpg',
-  '/images/runner_sprint.jpg',
+  '/images/girl pose1.jfif',
+  '/images/girl pose2.jfif',
   '/images/man outline.jfif',
   '/images/man pose1.jfif',
   '/images/man pose2.jfif',
-  '/images/girl pose1.jfif',
-  '/images/girl pose2.jfif',
+  '/images/hero_power.jpg',
+  '/images/runner_sprint.jpg',
 ];
 
 /**
  * Selects `count` unique background images at random from `/public/images/`.
- * Does not repeat images across tiles unless the image directory contains fewer images than tiles.
+ * Does not repeat images across tiles unless the directory contains fewer images than tiles.
  */
 export function selectUniqueTileBackgrounds(count = 4, pool = AVAILABLE_BACKGROUND_IMAGES) {
   const source = Array.isArray(pool) && pool.length > 0 ? [...pool] : [...AVAILABLE_BACKGROUND_IMAGES];
 
-  // Fisher-Yates shuffle
+  // Fisher-Yates shuffle for unbiased non-duplicating random selection
   for (let i = source.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [source[i], source[j]] = [source[j], source[i]];
@@ -26,7 +26,7 @@ export function selectUniqueTileBackgrounds(count = 4, pool = AVAILABLE_BACKGROU
 
   const selected = [];
   for (let i = 0; i < count; i++) {
-    selected.push(source[i % source.length]);
+    selected.push(encodeURI(source[i % source.length]));
   }
   return selected;
 }
