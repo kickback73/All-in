@@ -1,140 +1,297 @@
-import React, { useState } from 'react';
-import { Activity, ShieldAlert, Sparkles, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
-import { useApp } from '../context/AppContext';
-import { DAILY_TARGETS } from '../data/initialData';
+// src/components/MtorMonitor.jsx
+import React, { useMemo } from 'react';
+import { Activity, ShieldAlert, Sparkles, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ESSENTIAL_AMINO_ACIDS } from '../data/initialData';
 
-export default function MtorMonitor() {
-  const { todayTotals, progressMetrics } = useApp();
-  const [isGuidanceExpanded, setIsGuidanceExpanded] = useState(false);
+/**
+ * Models 24-hour mTORC1 signaling activation (0-100%) based on dietary leucine/BCAA
+ * kinetics, protein load, meal timing, and exponential fasting decay into autophagy (<25%).
+ */
+export function calculate24HourMtorTimeline(meals = [], plannedStacks = [], currentHour = new Date().getHours()) {
+  const points = [];
 
-  const isAmberCaution = progressMetrics.isMethionineCaution;
-  const isRedExceeded = progressMetrics.isMethionineExceeded;
+  for (let hour = 0; hour < 24; hour++) {
+    let actualActivation = 14; // Basal fasting autophagy floor (~14%)
+    let projectedActivation = 14;
+
+    // Actual meals impact
+    meals.forEach((meal) => {
+      let mealHour = 8;
+      if (meal.timestamp) {
+        const d = new Date(meal.timestamp);
+        if (!isNaN(d.getTime())) {
+          mealHour = d.getHours() + d.getMinutes() / 60;
+        }
+      }
+      const dt = hour - mealHour;
+      if (dt >= 0 && dt <= 7) {
+        const leucineG = (Number(meal.leucineMg) || Number(meal.protein) * 80 || 0) / 1000;
+        const carbsG = Number(meal.carbs) || 0;
+        const amplitude = Math.min(82, leucineG * 26 + carbsG * 0.35);
+        // Absorption peak at ~1.25h, decaying over 5.5h
+        const impulse = amplitude * (dt / 1.25) * Math.exp(1 - dt / 1.25);
+        actualActivation += Math.max(0, impulse);
+      }
+    });
+
+    projectedActivation = actualActivation;
+
+    // Projected future planned stacks
+    plannedStacks
+      .filter((s) => s.isRecurringPlanned && s.scheduledHour)
+      .forEach((stack) => {
+        const [sh, sm] = stack.scheduledHour.split(':').map(Number);
+        const stackHour = (sh || 8) + (sm || 0) / 60;
+        const dt = hour - stackHour;
+        if (dt >= 0 && dt <= 7) {
+          const leucineG = (Number(stack.totals?.aminos?.leucine) || 0) / 1000;
+          const carbsG = Number(stack.totals?.carbs) || 0;
+          const amplitude = Math.min(82, leucineG * 26 + carbsG * 0.35);
+          const impulse = amplitude * (dt / 1.25) * Math.exp(1 - dt / 1.25);
+          projectedActivation += Math.max(0, impulse);
+        }
+      });
+
+    points.push({
+      hour,
+      label: `${String(hour).padStart(2, '0')}:00`,
+      actual: hour <= currentHour ? Math.min(100, Math.round(actualActivation)) : null,
+      projected: Math.min(100, Math.round(projectedActivation)),
+    });
+  }
+
+  return points;
+}
+
+export default function MtorMonitor({
+  aminoTotals = {},
+  todayMeals = [],
+  plannedStacks = [],
+}) {
+  const currentHour = new Date().getHours();
+  const timeline = useMemo(
+    () => calculate24HourMtorTimeline(todayMeals, plannedStacks, currentHour),
+    [todayMeals, plannedStacks, currentHour]
+  );
+
+  const currentLevel = timeline[currentHour]?.actual ?? 14;
+  const isElevated = currentLevel > 55;
+  const isAutophagyWindow = currentLevel <= 25;
+
+  const leucineGrams = ((aminoTotals.leucine || 0) / 1000).toFixed(2);
+
+  // SVG Radar Coordinates
+  const radarCoords = useMemo(() => {
+    const cx = 100;
+    const cy = 100;
+    const maxR = 75;
+
+    const coords = ESSENTIAL_AMINO_ACIDS.map((aa, i) => {
+      const angle = (Math.PI * 2 * i) / ESSENTIAL_AMINO_ACIDS.length - Math.PI / 2;
+      const val = aminoTotals[aa.key] || 0;
+      const norm = Math.min(1, Math.max(0.12, val / 3000));
+      const r = norm * maxR;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      const lx = cx + (maxR + 15) * Math.cos(angle);
+      const ly = cy + (maxR + 15) * Math.sin(angle);
+      return { x, y, lx, ly, label: aa.label.slice(0, 3).toUpperCase(), angle };
+    });
+
+    const polygonPoints = coords.map((c) => `${c.x},${c.y}`).join(' ');
+    return { cx, cy, maxR, coords, polygonPoints };
+  }, [aminoTotals]);
 
   return (
-    <div className={`rounded-3xl p-5 border transition-all ${
-      isRedExceeded
-        ? 'glass-panel border-rose-500/50 bg-rose-950/20'
-        : isAmberCaution
-        ? 'glass-panel-glow-amber border-amber-500/40'
-        : 'glass-panel border-white/10'
-    }`}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2.5">
-          <div className={`p-2 rounded-xl ${
-            isRedExceeded
-              ? 'bg-rose-500 text-white'
-              : isAmberCaution
-              ? 'bg-amber-500 text-slate-950'
-              : 'bg-emerald-500/20 text-emerald-400'
-          }`}>
-            <Activity className="w-4 h-4 stroke-[2.5px]" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h3 className="text-sm font-extrabold text-white tracking-wide">mTOR Pathway Regulation</h3>
-              {isAmberCaution && (
-                <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
-                  <AlertTriangle className="w-2.5 h-2.5" />
-                  <span>Safety Threshold</span>
-                </span>
-              )}
-            </div>
-            <p className="text-[10px] text-slate-400 font-medium">
-              Muscle retention vs Indolent NHL remission balance
-            </p>
-          </div>
+    <div className="space-y-4 text-slate-900">
+      {/* Dynamic Status Notification Banner */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-black uppercase border flex items-center gap-1.5 ${
+              isElevated
+                ? 'bg-amber-100 text-amber-900 border-amber-300'
+                : isAutophagyWindow
+                ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                : 'bg-sky-100 text-sky-900 border-sky-300'
+            }`}
+          >
+            {isElevated ? (
+              <>
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                <span>Elevated mTOR ({currentLevel}%)</span>
+              </>
+            ) : isAutophagyWindow ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Autophagy & Cleansing Window ({currentLevel}%)</span>
+              </>
+            ) : (
+              <>
+                <Activity className="w-3.5 h-3.5 text-sky-600" />
+                <span>Normative Basal Tone ({currentLevel}%)</span>
+              </>
+            )}
+          </span>
         </div>
 
-        <button
-          onClick={() => setIsGuidanceExpanded(!isGuidanceExpanded)}
-          className="text-slate-400 hover:text-slate-200 p-1 rounded-lg bg-slate-900/60 border border-white/5"
-          title="Toggle clinical scientific guidance"
-        >
-          {isGuidanceExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
+        <div className="text-xs font-bold text-slate-600">
+          Daily Leucine: <strong className="text-slate-900">{leucineGrams}g</strong> (NHL Remission Guidance: &lt; 2.0g/meal)
+        </div>
       </div>
 
-      {/* Amino Acid Trackers */}
-      <div className="space-y-4 my-2">
-        {/* 1. Leucine Pulse Gauge */}
-        <div>
-          <div className="flex justify-between items-baseline text-xs mb-1.5">
-            <span className="font-semibold text-slate-300 flex items-center space-x-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>Leucine Anabolic Pulse</span>
-            </span>
-            <div className="font-mono text-xs">
-              <span className="text-emerald-300 font-extrabold">{todayTotals.leucine}g</span>
-              <span className="text-slate-500"> / {DAILY_TARGETS.leucineTarget}g target</span>
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+        {/* 1. Multi-Spectrum Amino Acid Radar / Spider Chart */}
+        <div className="md:col-span-5 rounded-2xl bg-white/95 border border-slate-200/90 p-3.5 flex flex-col items-center shadow-2xs">
+          <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase text-slate-700 mb-1">
+            <Sparkles className="w-3.5 h-3.5 text-sky-600" />
+            <span>9 EAA Radar Spectrum</span>
           </div>
-
-          <div className="w-full bg-slate-900/80 rounded-full h-2.5 overflow-hidden border border-white/5 p-0.5">
-            <div
-              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, progressMetrics.leucinePct)}%` }}
-            ></div>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-1">
-            {todayTotals.leucine >= DAILY_TARGETS.leucineTarget
-              ? '✓ Target achieved. Skeletal muscle protein synthesis triggered.'
-              : `${(DAILY_TARGETS.leucineTarget - todayTotals.leucine).toFixed(2)}g remaining to stimulate muscle protein preservation.`}
-          </p>
+          <svg viewBox="0 0 200 200" className="w-44 h-44">
+            {/* Concentric Reference Rings */}
+            {[25, 50, 75].map((r) => (
+              <circle
+                key={r}
+                cx={radarCoords.cx}
+                cy={radarCoords.cy}
+                r={r}
+                fill="none"
+                stroke="#e2e8f0"
+                strokeDasharray="2 2"
+              />
+            ))}
+            {/* 9 Axes */}
+            {radarCoords.coords.map((c, idx) => (
+              <g key={idx}>
+                <line
+                  x1={radarCoords.cx}
+                  y1={radarCoords.cy}
+                  x2={radarCoords.cx + radarCoords.maxR * Math.cos(c.angle)}
+                  y2={radarCoords.cy + radarCoords.maxR * Math.sin(c.angle)}
+                  stroke="#cbd5e1"
+                  strokeWidth="1"
+                />
+                <text
+                  x={c.lx}
+                  y={c.ly}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="fill-slate-600 text-[8px] font-extrabold"
+                >
+                  {c.label}
+                </text>
+              </g>
+            ))}
+            {/* Plotted EAA Area */}
+            <polygon
+              points={radarCoords.polygonPoints}
+              fill="rgba(14, 165, 233, 0.28)"
+              stroke="#0284c7"
+              strokeWidth="2"
+            />
+          </svg>
         </div>
 
-        {/* 2. Methionine Safety Threshold Gauge */}
-        <div>
-          <div className="flex justify-between items-baseline text-xs mb-1.5">
-            <span className="font-semibold text-slate-300 flex items-center space-x-1.5">
-              <span className={`w-2 h-2 rounded-full ${isRedExceeded ? 'bg-rose-500' : isAmberCaution ? 'bg-amber-400' : 'bg-cyan-400'}`}></span>
-              <span>Methionine Safety Ceiling</span>
-            </span>
-            <div className="font-mono text-xs">
-              <span className={`font-extrabold ${isRedExceeded ? 'text-rose-400' : isAmberCaution ? 'text-amber-300' : 'text-cyan-300'}`}>
-                {todayTotals.methionine}g
+        {/* 2. 24-Hour Metabolic mTOR Signaling Graph */}
+        <div className="md:col-span-7 rounded-2xl bg-white/95 border border-slate-200/90 p-3.5 space-y-2 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-extrabold uppercase text-slate-800">
+              24-Hour mTOR Signaling & Autophagy Timeline
+            </div>
+            <div className="flex items-center gap-3 text-[10px] font-bold">
+              <span className="flex items-center gap-1 text-sky-700">
+                <span className="w-2.5 h-1 bg-sky-600 inline-block rounded" /> Actual Logged
               </span>
-              <span className="text-slate-500"> / {DAILY_TARGETS.methionineSafetyCeiling}g limit</span>
+              <span className="flex items-center gap-1 text-indigo-600">
+                <span className="w-2.5 h-1 bg-indigo-400 inline-block rounded" /> Planned Future
+              </span>
             </div>
           </div>
 
-          <div className="w-full bg-slate-900/80 rounded-full h-2.5 overflow-hidden border border-white/5 p-0.5">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                isRedExceeded
-                  ? 'bg-rose-500'
-                  : isAmberCaution
-                  ? 'bg-gradient-to-r from-amber-400 to-amber-500'
-                  : 'bg-gradient-to-r from-cyan-500 to-blue-400'
-              }`}
-              style={{ width: `${Math.min(100, progressMetrics.methioninePct)}%` }}
-            ></div>
-          </div>
-          <p className={`text-[10px] mt-1 ${isAmberCaution ? 'text-amber-300 font-semibold' : 'text-slate-400'}`}>
-            {isRedExceeded
-              ? '⚠️ Daily methionine ceiling exceeded. Favour marine collagen or plant proteins for remaining meals.'
-              : isAmberCaution
-              ? '⚡ Approaching safety threshold (>1.4g). Prioritise tofu, collagen, or egg white scrambles.'
-              : 'Optimal cellular baseline. Autophagy and mTOR downregulation maintained.'}
-          </p>
+          <svg viewBox="0 0 360 145" className="w-full h-36 overflow-visible">
+            {/* Elevated Anabolic Threshold (55%) */}
+            <line
+              x1="24"
+              y1={120 - 0.55 * 100}
+              x2="350"
+              y2={120 - 0.55 * 100}
+              stroke="#f59e0b"
+              strokeDasharray="4 3"
+              strokeWidth="1"
+            />
+            <text x="28" y={116 - 0.55 * 100} className="fill-amber-700 text-[8px] font-bold">
+              Elevated Anabolic Threshold (NHL Remission Ceiling 55%)
+            </text>
+
+            {/* Autophagy Trough Zone (<25%) */}
+            <rect
+              x="24"
+              y={120 - 0.25 * 100}
+              width="326"
+              height={0.25 * 100}
+              fill="rgba(16, 185, 129, 0.12)"
+            />
+            <text x="28" y="116" className="fill-emerald-800 text-[8px] font-bold">
+              Favourable Autophagy Trough Zone (&lt;25%)
+            </text>
+
+            {/* Plot Lines & Area */}
+            {(() => {
+              const xStep = 326 / 23;
+              const projPts = timeline.map((pt, i) => ({
+                x: 24 + i * xStep,
+                y: 120 - (pt.projected / 100) * 100,
+              }));
+              const actPts = timeline
+                .filter((pt) => pt.actual !== null)
+                .map((pt, i) => ({
+                  x: 24 + i * xStep,
+                  y: 120 - (pt.actual / 100) * 100,
+                }));
+
+              const projPath = projPts
+                .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
+                .join(' ');
+              const actPath = actPts
+                .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
+                .join(' ');
+              const actArea =
+                actPts.length > 0
+                  ? `${actPath} L ${actPts[actPts.length - 1].x} 120 L 24 120 Z`
+                  : '';
+
+              return (
+                <>
+                  {actArea && <path d={actArea} fill="rgba(2, 132, 199, 0.20)" />}
+                  <path
+                    d={projPath}
+                    fill="none"
+                    stroke="#818cf8"
+                    strokeWidth="2"
+                    strokeDasharray="4 3"
+                  />
+                  {actPath && (
+                    <path d={actPath} fill="none" stroke="#0284c7" strokeWidth="2.5" />
+                  )}
+                </>
+              );
+            })()}
+
+            {/* X-Axis Hour Markers */}
+            {[0, 6, 12, 18, 23].map((h) => (
+              <text
+                key={h}
+                x={24 + (h * 326) / 23}
+                y="136"
+                textAnchor="middle"
+                className="fill-slate-500 text-[8px] font-bold"
+              >
+                {String(h).padStart(2, '0')}:00
+              </text>
+            ))}
+          </svg>
         </div>
       </div>
-
-      {/* Collapsible Scientific & Clinical Guidance */}
-      {isGuidanceExpanded && (
-        <div className="mt-4 pt-3 border-t border-white/10 text-xs text-slate-300 space-y-2.5 bg-slate-950/60 rounded-2xl p-3.5">
-          <div className="flex items-center space-x-2 text-emerald-400 font-bold">
-            <ShieldAlert className="w-4 h-4" />
-            <span>Retatrutide & Remission Synchronisation Rationale</span>
-          </div>
-          <p className="text-[11px] leading-relaxed text-slate-300">
-            During rapid weight loss on triple agonist <strong className="text-white">retatrutide</strong>, skeletal muscle protection requires acute <strong className="text-emerald-300">leucine pulses</strong> (2.5g–3.5g) to trigger muscle protein synthesis without constant excess caloric load.
-          </p>
-          <p className="text-[11px] leading-relaxed text-slate-300">
-            Concurrently, for <strong className="text-white">indolent NHL remission</strong>, excessive chronic mTORC1 hyperactivity is moderated by keeping daily <strong className="text-amber-300">methionine intake capped under 1.8g</strong>. High-density staples like marine collagen peptides, liquid egg whites, extra firm tofu, and Pacific cod deliver massive protein payloads while remaining gentle on methionine accumulation.
-          </p>
-        </div>
-      )}
     </div>
   );
 }

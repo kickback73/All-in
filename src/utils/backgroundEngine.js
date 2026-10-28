@@ -1,76 +1,57 @@
-// Dynamic Full-Scale Rotating Background Engine
-// Rotates diverse full-scale visual assets and transparent silhouettes from /images/
+// src/utils/backgroundEngine.js
+// Non-duplicating randomized tile background engine and 12:01 AM daily reset logic
 
-export const BACKGROUND_ASSETS = [
-  {
-    id: 'hero-power',
-    path: '/images/hero_power.jpg',
-    title: 'Neon Power Stance',
-    subtitle: 'Triple Agonist Metabolic Calibre & Lean Retention',
-    accentColour: 'emerald'
-  },
-  {
-    id: 'runner-sprint',
-    path: '/images/runner_sprint.jpg',
-    title: 'Sprint Conditioning',
-    subtitle: 'Explosive Neuromuscular & Cardiovascular Output',
-    accentColour: 'cyan'
-  },
-  {
-    id: 'man-outline',
-    path: '/images/man outline.jfif',
-    title: 'Athletic Blueprint',
-    subtitle: 'Functional Calisthenics & Resistance Framework',
-    accentColour: 'emerald'
-  },
-  {
-    id: 'man-pose1',
-    path: '/images/man pose1.jfif',
-    title: 'Power Stance Alpha',
-    subtitle: 'Progressive Band Tension & Heavy Loops',
-    accentColour: 'cyan'
-  },
-  {
-    id: 'man-pose2',
-    path: '/images/man pose2.jfif',
-    title: 'Focus Conditioning',
-    subtitle: 'Endurance & Core Calibre',
-    accentColour: 'violet'
-  },
-  {
-    id: 'girl-pose1',
-    path: '/images/girl pose1.jfif',
-    title: 'Dynamic Agility',
-    subtitle: 'Explosive Plyometrics & Joint Mobility',
-    accentColour: 'rose'
-  },
-  {
-    id: 'girl-pose2',
-    path: '/images/girl pose2.jfif',
-    title: 'Core Precision',
-    subtitle: 'Ab Wheel Trunk Alignment & Anti-Extension',
-    accentColour: 'amber'
-  }
+export const AVAILABLE_BACKGROUND_IMAGES = [
+  '/images/hero_power.jpg',
+  '/images/runner_sprint.jpg',
+  '/images/man outline.jfif',
+  '/images/man pose1.jfif',
+  '/images/man pose2.jfif',
+  '/images/girl pose1.jfif',
+  '/images/girl pose2.jfif',
 ];
 
-export function getRotatedBackground(rotationMode = 'daily') {
-  const now = new Date();
-  
-  if (rotationMode === 'random') {
-    const randomIndex = Math.floor(Math.random() * BACKGROUND_ASSETS.length);
-    return BACKGROUND_ASSETS[randomIndex];
+/**
+ * Selects `count` unique background images at random from `/public/images/`.
+ * Does not repeat images across tiles unless the image directory contains fewer images than tiles.
+ */
+export function selectUniqueTileBackgrounds(count = 4, pool = AVAILABLE_BACKGROUND_IMAGES) {
+  const source = Array.isArray(pool) && pool.length > 0 ? [...pool] : [...AVAILABLE_BACKGROUND_IMAGES];
+
+  // Fisher-Yates shuffle
+  for (let i = source.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [source[i], source[j]] = [source[j], source[i]];
   }
 
-  if (rotationMode === 'weekly') {
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-    const pastDaysOfYear = (now - startOfYear) / 86400000;
-    const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
-    const index = weekNumber % BACKGROUND_ASSETS.length;
-    return BACKGROUND_ASSETS[index];
+  const selected = [];
+  for (let i = 0; i < count; i++) {
+    selected.push(source[i % source.length]);
   }
+  return selected;
+}
 
-  // Default: Daily rotation based on day of month
-  const dayOfMonth = now.getDate();
-  const index = dayOfMonth % BACKGROUND_ASSETS.length;
-  return BACKGROUND_ASSETS[index];
+/**
+ * Computes the active calendar cycle key anchored at 12:01 AM (00:01) local time.
+ * At 12:01 AM local time, this key shifts and triggers a daily reset of all daily summary counters.
+ */
+export function getActiveCycleDateKey(now = new Date()) {
+  // Shift by 1 minute so 00:00:00 - 00:00:59 belongs to previous cycle, 00:01:00 begins new day
+  const adjusted = new Date(now.getTime() - 60 * 1000);
+  const year = adjusted.getFullYear();
+  const month = String(adjusted.getMonth() + 1).padStart(2, '0');
+  const day = String(adjusted.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Filters any list of timestamped entries to only those recorded on or after 12:01 AM today.
+ */
+export function filterTodayEntries(entries = [], now = new Date()) {
+  if (!Array.isArray(entries)) return [];
+  const activeKey = getActiveCycleDateKey(now);
+  return entries.filter((entry) => {
+    if (!entry?.timestamp) return false;
+    return getActiveCycleDateKey(new Date(entry.timestamp)) === activeKey;
+  });
 }

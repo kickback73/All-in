@@ -1,273 +1,533 @@
-import React, { useState, useRef } from 'react';
+// src/components/UserProfileModal.jsx
+import React, { useState, useMemo } from 'react';
 import {
   X,
-  User,
-  Upload,
-  Camera,
-  CheckCircle2,
-  Shield,
-  Download,
-  Cloud,
-  Sliders,
-  Scale,
-  Ruler,
+  History,
   Calendar,
-  HeartPulse
+  Filter,
+  Trash2,
+  Edit2,
+  Check,
+  RotateCcw,
+  Droplets,
+  Utensils,
+  Syringe,
+  Activity,
+  SlidersHorizontal,
+  User
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
-import { AVATAR_PROFILES } from '../data/assets';
 
-export default function UserProfileModal() {
-  const {
-    isSyncModalOpen,
-    setIsSyncModalOpen,
-    userProfile,
-    updateUserProfile,
-    googleSheetsWebhookUrl,
-    setGoogleSheetsWebhookUrl,
-    exportBackup,
-    lastSyncTime
-  } = useApp();
+export default function UserProfileModal({
+  isOpen,
+  onClose,
+  logs = [],
+  onUpdateLog,
+  onDeleteLog,
+  userProfile = {},
+  onUpdateUserProfile,
+}) {
+  const [activeSubTab, setActiveSubTab] = useState('HISTORICAL_LOG'); // 'HISTORICAL_LOG' | 'BIOMETRICS'
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState({});
 
-  const [formData, setFormData] = useState({
-    name: userProfile.name || 'Athlete DK',
-    weightKg: userProfile.weightKg || 84,
-    heightCm: userProfile.heightCm || 182,
-    age: userProfile.age || 46,
-    targetWeightKg: userProfile.targetWeightKg || 78,
-    dailyCaloricTarget: userProfile.dailyCaloricTarget || 1950,
-    dailyProteinTarget: userProfile.dailyProteinTarget || 165,
-    customPhotoUrl: userProfile.customPhotoUrl || null,
-    selectedAvatarId: userProfile.selectedAvatarId || 'hero-power'
+  // Profile form
+  const [profileForm, setProfileForm] = useState({
+    name: userProfile?.name || 'Athlete DK',
+    weightKg: userProfile?.weightKg || 84,
+    heightCm: userProfile?.heightCm || 182,
+    age: userProfile?.age || 46,
+    targetWeightKg: userProfile?.targetWeightKg || 78,
   });
 
-  const [tempWebhookUrl, setTempWebhookUrl] = useState(googleSheetsWebhookUrl || '');
-  const [saveBanner, setSaveBanner] = useState(false);
-  const fileInputRef = useRef(null);
+  const filteredLogs = useMemo(() => {
+    return [...logs]
+      .filter((entry) => {
+        if (categoryFilter !== 'ALL' && entry.category !== categoryFilter) return false;
+        const entryDate = entry.timestamp ? entry.timestamp.slice(0, 10) : '';
+        if (startDate && entryDate < startDate) return false;
+        if (endDate && entryDate > endDate) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }, [logs, startDate, endDate, categoryFilter]);
 
-  if (!isSyncModalOpen) return null;
+  if (!isOpen) return null;
 
-  const handlePhotoUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({
-          ...prev,
-          customPhotoUrl: reader.result
-        }));
-      };
-      reader.readAsDataURL(file);
+  const startEditing = (entry) => {
+    setEditingId(entry.id);
+    setEditDraft({ ...entry });
+  };
+
+  const saveEdit = () => {
+    if (!editingId || !onUpdateLog) return;
+    onUpdateLog(editingId, editDraft);
+    setEditingId(null);
+    setEditDraft({});
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft({});
+  };
+
+  const getCategoryIcon = (cat) => {
+    switch (cat) {
+      case 'WATER':
+        return <Droplets className="w-3.5 h-3.5 text-sky-600" />;
+      case 'NUTRITION':
+        return <Utensils className="w-3.5 h-3.5 text-teal-600" />;
+      case 'PEPTIDE':
+        return <Syringe className="w-3.5 h-3.5 text-indigo-600" />;
+      case 'ACTIVITY':
+        return <Activity className="w-3.5 h-3.5 text-emerald-600" />;
+      default:
+        return <History className="w-3.5 h-3.5 text-slate-600" />;
     }
   };
 
-  const handleSaveProfile = (e) => {
-    e.preventDefault();
-    updateUserProfile(formData);
-    setGoogleSheetsWebhookUrl(tempWebhookUrl);
-    setSaveBanner(true);
-    setTimeout(() => {
-      setSaveBanner(false);
-      setIsSyncModalOpen(false);
-    }, 1200);
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-      <div className="glass-panel w-full max-w-sm rounded-3xl p-5 border border-white/10 shadow-2xl relative max-h-[90vh] overflow-y-auto no-scrollbar">
-        <button
-          onClick={() => setIsSyncModalOpen(false)}
-          className="absolute top-4 right-4 p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        <div className="flex items-center space-x-2.5 mb-3">
-          <div className="p-2 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-            <User className="w-4 h-4 stroke-[2.5px]" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 text-slate-900">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
+        {/* Header Bar */}
+        <div className="px-6 py-4.5 bg-[#F4F8FB] border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-sky-600 text-white shadow-xs">
+              <History className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-900">
+                Historical Log & Profile Settings
+              </h2>
+              <p className="text-xs text-slate-500">
+                Retrospective CRUD operations across nutrition, hydration, peptide protocols, and activities.
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-base font-extrabold text-white">Athlete Profile & Biometrics</h3>
-            <p className="text-[10px] text-slate-400">Personal calibration across all app metrics</p>
+
+          <div className="flex items-center gap-2">
+            <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setActiveSubTab('HISTORICAL_LOG')}
+                className={`px-3 py-1.5 rounded-xl transition ${
+                  activeSubTab === 'HISTORICAL_LOG'
+                    ? 'bg-white text-sky-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Historical Log ({logs.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSubTab('BIOMETRICS')}
+                className={`px-3 py-1.5 rounded-xl transition ${
+                  activeSubTab === 'BIOMETRICS'
+                    ? 'bg-white text-sky-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Profile & Goals
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-full hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition"
+              aria-label="Close Historical Log View"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
-        <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
-          {/* Profile Picture Upload Section */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 flex items-center space-x-3.5">
-            <div className="relative group">
-              <img
-                src={formData.customPhotoUrl || AVATAR_PROFILES.find(a => a.id === formData.selectedAvatarId)?.path || '/images/hero_power.jpg'}
-                alt="Profile Avatar"
-                className="w-16 h-16 rounded-full object-cover border-2 border-emerald-400/80 shadow-md ring-2 ring-white/10"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white"
-                title="Upload Photo"
-              >
-                <Camera className="w-5 h-5 text-emerald-400" />
-              </button>
-            </div>
-
-            <div className="flex-1 space-y-1">
-              <span className="font-extrabold text-white block text-xs">{formData.name}</span>
-              <p className="text-[10px] text-slate-400">Upload your own photo to display in the header icon.</p>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center space-x-1 hover:bg-emerald-500/30"
-              >
-                <Upload className="w-3 h-3" />
-                <span>Upload Picture</span>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoUpload}
-                className="hidden"
-              />
-            </div>
-          </div>
-
-          {/* Preset Visual Avatars Selection (Alternative) */}
-          <div className="space-y-1.5">
-            <label className="text-slate-400 text-[11px] font-semibold block">Or choose an athlete preset:</label>
-            <div className="grid grid-cols-4 gap-2">
-              {AVATAR_PROFILES.slice(0, 4).map((av) => (
-                <button
-                  key={av.id}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, selectedAvatarId: av.id, customPhotoUrl: null })}
-                  className={`relative p-1 rounded-xl border transition-all ${
-                    !formData.customPhotoUrl && formData.selectedAvatarId === av.id
-                      ? 'border-emerald-400 bg-emerald-950/40 ring-2 ring-emerald-500/50'
-                      : 'border-white/10 bg-slate-900/60 hover:border-white/30'
-                  }`}
+        {activeSubTab === 'HISTORICAL_LOG' && (
+          <>
+            {/* Filter Controls (Date Range & Category) */}
+            <div className="px-6 py-3.5 border-b border-slate-100 bg-white grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-[11px] font-extrabold uppercase text-slate-600 mb-1">
+                  From Date
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-900 font-bold bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-extrabold uppercase text-slate-600 mb-1">
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-900 font-bold bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-extrabold uppercase text-slate-600 mb-1">
+                  Filter Category
+                </label>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-900 font-bold bg-white"
                 >
-                  <img
-                    src={av.path}
-                    alt={av.name}
-                    className="w-full aspect-square rounded-lg object-cover"
-                  />
+                  <option value="ALL">All Categories ({logs.length})</option>
+                  <option value="WATER">Hydration (Water)</option>
+                  <option value="NUTRITION">Nutrition & Meals</option>
+                  <option value="PEPTIDE">Peptides</option>
+                  <option value="ACTIVITY">Activity & Steps</option>
+                </select>
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                    setCategoryFilter('ALL');
+                  }}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-1.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Filters</span>
                 </button>
-              ))}
+              </div>
             </div>
+
+            {/* Historical Entries Ledger Table / List */}
+            <div className="p-6 overflow-y-auto flex-1">
+              {filteredLogs.length === 0 ? (
+                <div className="text-center py-16 rounded-3xl border border-dashed border-slate-200 bg-[#F4F8FB]/50 space-y-2">
+                  <p className="text-sm font-extrabold text-slate-700">No historical records match your filter criteria.</p>
+                  <p className="text-xs text-slate-500">
+                    Log new entries using the persistent + button or top hydration action bar.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredLogs.map((entry) => {
+                    const isEditing = editingId === entry.id;
+                    return (
+                      <div
+                        key={entry.id}
+                        className="rounded-2xl border border-slate-200 p-4 bg-white shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition hover:border-slate-300"
+                      >
+                        <div className="space-y-1.5 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-sky-50 text-sky-800 border border-sky-200 flex items-center gap-1">
+                              {getCategoryIcon(entry.category)}
+                              <span>{entry.category}</span>
+                            </span>
+                            <span className="text-xs font-semibold text-slate-500">
+                              {new Date(entry.timestamp).toLocaleString()}
+                            </span>
+                          </div>
+
+                          {!isEditing ? (
+                            <div className="pt-0.5">
+                              <div className="text-sm font-extrabold text-slate-900">{entry.title}</div>
+                              <div className="text-xs text-slate-600 mt-0.5 font-medium">{entry.summary}</div>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 pt-2">
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-500">
+                                  Title / Name
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editDraft.title || ''}
+                                  onChange={(e) =>
+                                    setEditDraft((d) => ({ ...d, title: e.target.value }))
+                                  }
+                                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-900 font-bold"
+                                />
+                              </div>
+
+                              {entry.category === 'WATER' && (
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase text-slate-500">
+                                    Volume (ml)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={editDraft.amountMl || 0}
+                                    onChange={(e) => {
+                                      const amountMl = Number(e.target.value);
+                                      setEditDraft((d) => ({
+                                        ...d,
+                                        amountMl,
+                                        summary: `${amountMl} ml water intake`,
+                                      }));
+                                    }}
+                                    className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-900 font-bold"
+                                  />
+                                </div>
+                              )}
+
+                              {entry.category === 'NUTRITION' && (
+                                <>
+                                  <div>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-500">
+                                      Calories (kcal)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={editDraft.calories || 0}
+                                      onChange={(e) => {
+                                        const calories = Number(e.target.value);
+                                        setEditDraft((d) => ({
+                                          ...d,
+                                          calories,
+                                          summary: `${calories} kcal • ${d.protein || 0}g P • ${d.carbs || 0}g C • ${d.fats || 0}g F`,
+                                        }));
+                                      }}
+                                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-900 font-bold"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-500">
+                                      Protein (g)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={editDraft.protein || 0}
+                                      onChange={(e) => {
+                                        const protein = Number(e.target.value);
+                                        setEditDraft((d) => ({
+                                          ...d,
+                                          protein,
+                                          summary: `${d.calories || 0} kcal • ${protein}g P • ${d.carbs || 0}g C • ${d.fats || 0}g F`,
+                                        }));
+                                      }}
+                                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-900 font-bold"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-500">
+                                      Leucine (mg)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={editDraft.leucineMg || 0}
+                                      onChange={(e) =>
+                                        setEditDraft((d) => ({
+                                          ...d,
+                                          leucineMg: Number(e.target.value),
+                                        }))
+                                      }
+                                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-900 font-bold"
+                                    />
+                                  </div>
+                                </>
+                              )}
+
+                              {entry.category === 'PEPTIDE' && (
+                                <>
+                                  <div>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-500">
+                                      Dose (mcg)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={editDraft.doseMcg || 0}
+                                      onChange={(e) => {
+                                        const doseMcg = Number(e.target.value);
+                                        setEditDraft((d) => ({
+                                          ...d,
+                                          doseMcg,
+                                          summary: `${doseMcg} mcg • Site: ${d.site || 'SubQ'}`,
+                                        }));
+                                      }}
+                                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-900 font-bold"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-500">
+                                      Site Note
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editDraft.site || ''}
+                                      onChange={(e) => {
+                                        const site = e.target.value;
+                                        setEditDraft((d) => ({
+                                          ...d,
+                                          site,
+                                          summary: `${d.doseMcg || 0} mcg • Site: ${site}`,
+                                        }));
+                                      }}
+                                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-900 font-bold"
+                                    />
+                                  </div>
+                                </>
+                              )}
+
+                              {entry.category === 'ACTIVITY' && (
+                                <>
+                                  <div>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-500">
+                                      Duration (min)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={editDraft.durationMin || 0}
+                                      onChange={(e) => {
+                                        const durationMin = Number(e.target.value);
+                                        setEditDraft((d) => ({
+                                          ...d,
+                                          durationMin,
+                                          summary: `${durationMin} mins • ${d.steps || 0} steps`,
+                                        }));
+                                      }}
+                                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-900 font-bold"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-bold uppercase text-slate-500">
+                                      Steps
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={editDraft.steps || 0}
+                                      onChange={(e) => {
+                                        const steps = Number(e.target.value);
+                                        setEditDraft((d) => ({
+                                          ...d,
+                                          steps,
+                                          summary: `${d.durationMin || 0} mins • ${steps} steps`,
+                                        }));
+                                      }}
+                                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-900 font-bold"
+                                    />
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Inline Action Buttons */}
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          {!isEditing ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => startEditing(entry)}
+                                className="px-3.5 py-1.5 rounded-full text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition flex items-center gap-1"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onDeleteLog && onDeleteLog(entry.id)}
+                                className="px-3.5 py-1.5 rounded-full text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={saveEdit}
+                                className="px-4 py-1.5 rounded-full text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 transition flex items-center gap-1 shadow-2xs"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Save</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEdit}
+                                className="px-3 py-1.5 rounded-full text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Profile & Goals SubTab */}
+        {activeSubTab === 'BIOMETRICS' && (
+          <div className="p-6 overflow-y-auto space-y-6">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (onUpdateUserProfile) onUpdateUserProfile(profileForm);
+                onClose();
+              }}
+              className="space-y-4 max-w-lg"
+            >
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
+                  Athlete Name
+                </label>
+                <input
+                  type="text"
+                  value={profileForm.name}
+                  onChange={(e) => setProfileForm((p) => ({ ...p, name: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 font-bold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
+                    Weight (kg)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={profileForm.weightKg}
+                    onChange={(e) =>
+                      setProfileForm((p) => ({ ...p, weightKg: Number(e.target.value) }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
+                    Target Weight (kg)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={profileForm.targetWeightKg}
+                    onChange={(e) =>
+                      setProfileForm((p) => ({ ...p, targetWeightKg: Number(e.target.value) }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 font-bold"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="px-6 py-2.5 rounded-full text-xs font-extrabold text-white bg-sky-600 hover:bg-sky-700 transition"
+              >
+                Save Profile Parameters
+              </button>
+            </form>
           </div>
-
-          {/* Biometrics Inputs: Weight, Height, Age */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center space-x-1">
-              <HeartPulse className="w-3.5 h-3.5" />
-              <span>Biometric Parameters</span>
-            </span>
-
-            <div className="grid grid-cols-3 gap-2 font-mono">
-              <div>
-                <label className="block text-slate-400 text-[10px] font-sans font-semibold mb-1">Weight (kg)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={formData.weightKg}
-                  onChange={(e) => setFormData({ ...formData, weightKg: Number(e.target.value) })}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-white font-bold text-xs focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 text-[10px] font-sans font-semibold mb-1">Height (cm)</label>
-                <input
-                  type="number"
-                  step="1"
-                  value={formData.heightCm}
-                  onChange={(e) => setFormData({ ...formData, heightCm: Number(e.target.value) })}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-white font-bold text-xs focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 text-[10px] font-sans font-semibold mb-1">Age</label>
-                <input
-                  type="number"
-                  step="1"
-                  value={formData.age}
-                  onChange={(e) => setFormData({ ...formData, age: Number(e.target.value) })}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-white font-bold text-xs focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 font-mono pt-1">
-              <div>
-                <label className="block text-slate-400 text-[10px] font-sans font-semibold mb-1">Goal Weight (kg)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={formData.targetWeightKg}
-                  onChange={(e) => setFormData({ ...formData, targetWeightKg: Number(e.target.value) })}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-white font-bold text-xs focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 text-[10px] font-sans font-semibold mb-1">Daily Protein (g)</label>
-                <input
-                  type="number"
-                  step="5"
-                  value={formData.dailyProteinTarget}
-                  onChange={(e) => setFormData({ ...formData, dailyProteinTarget: Number(e.target.value) })}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1.5 text-emerald-300 font-bold text-xs focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Google Sheets Webhook Background Endpoint */}
-          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/5 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-300 font-semibold text-xs flex items-center space-x-1">
-                <Cloud className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Google Sheets Webhook Sync</span>
-              </span>
-              <span className="text-[10px] text-slate-500 font-mono">Automated Background</span>
-            </div>
-            <input
-              type="url"
-              placeholder="https://script.google.com/macros/s/.../exec"
-              value={tempWebhookUrl}
-              onChange={(e) => setTempWebhookUrl(e.target.value)}
-              className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-white font-mono text-[10px] focus:outline-none focus:border-cyan-500"
-            />
-            <p className="text-[10px] text-slate-400 leading-tight">
-              Synchronises active data automatically in the background without needing manual button clicks.
-            </p>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md transition-all flex items-center justify-center space-x-1.5"
-          >
-            {saveBanner ? (
-              <>
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Profile & Biometrics Saved!</span>
-              </>
-            ) : (
-              <span>Save Profile Calibration</span>
-            )}
-          </button>
-
-          {/* Offline JSON Backup Button */}
-          <button
-            type="button"
-            onClick={exportBackup}
-            className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs flex items-center justify-center space-x-2 transition-all border border-white/5"
-          >
-            <Download className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Export Complete Health JSON (.json)</span>
-          </button>
-        </form>
+        )}
       </div>
     </div>
   );

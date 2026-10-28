@@ -1,41 +1,32 @@
+// src/context/AppContext.jsx
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import {
   DEFAULT_MORNING_STACKS,
   DEFAULT_WORKOUT_PRESETS,
   DEFAULT_WORKOUT_REMINDERS,
   DAILY_TARGETS,
-  getInitialHistoricalLogs
+  ESSENTIAL_AMINO_ACIDS,
+  MICRONUTRIENT_FIELDS,
+  getInitialHistoricalLogs,
 } from '../data/initialData';
 import { INITIAL_PANTRY_STOCK } from '../data/pantryDatabase';
 import {
   loadStoredState,
   saveStoredState,
   syncBatchToGoogleSheets,
-  exportHealthBackupJSON
+  exportHealthBackupJSON,
 } from '../utils/syncService';
 import { feedbackEngine } from '../utils/soundEffects';
+import { getActiveCycleDateKey, filterTodayEntries } from '../utils/backgroundEngine';
 
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
-  const getTodayDateStr = () => new Date().toISOString().split('T')[0];
-
   const [isLoaded, setIsLoaded] = useState(false);
-
-  // Remember last viewed screen across device reopenings
-  const [activeTab, setActiveTabState] = useState(() => {
-    try {
-      return localStorage.getItem('dk_all_in_last_screen') || 'dashboard';
-    } catch (e) {
-      return 'dashboard';
-    }
-  });
+  const [activeTab, setActiveTabState] = useState('dashboard');
 
   const setActiveTab = useCallback((tab) => {
     setActiveTabState(tab);
-    try {
-      localStorage.setItem('dk_all_in_last_screen', tab);
-    } catch (e) {}
   }, []);
 
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
@@ -46,201 +37,127 @@ export function AppProvider({ children }) {
   const [lastSyncTime, setLastSyncTime] = useState(null);
   const [isGoogleHealthConnected, setIsGoogleHealthConnected] = useState(true);
 
-  // User Profile Biometrics & Custom Picture
+  // User Profile & Biometrics
   const [userProfile, setUserProfile] = useState({
     name: 'Athlete DK',
     weightKg: 84,
     heightCm: 182,
     age: 46,
     targetWeightKg: 78,
-    dailyCaloricTarget: 1950,
-    dailyProteinTarget: 165,
+    dailyCaloricTarget: 2200,
+    dailyProteinTarget: 140,
     customPhotoUrl: null,
-    selectedAvatarId: 'hero-power'
+    selectedAvatarId: 'hero-power',
   });
 
-  // Peptide Injection History
-  const [peptideHistory, setPeptideHistory] = useState([
-    {
-      id: 'pep-init-1',
-      compound: 'Retatrutide',
-      doseMg: 2.0,
-      unitsPulled: 40,
-      syringeLabel: 'U-100 (1.0 mL)',
-      site: 'Lower Left Abdomen (Periumbilical)',
-      concentration: 5.0,
-      timestamp: '08:30 AM',
-      date: 'Oct 20, 2026'
-    }
-  ]);
+  // Dynamic Daily Hydration Target (defaults to 2500 ml)
+  const [hydrationGoalMl, setHydrationGoalMl] = useState(DAILY_TARGETS.waterMl || 2500);
 
-  const [morningStacks, setMorningStacks] = useState(DEFAULT_MORNING_STACKS);
-  const [workoutPresets, setWorkoutPresets] = useState(DEFAULT_WORKOUT_PRESETS);
-  const [workoutReminders, setWorkoutReminders] = useState(DEFAULT_WORKOUT_REMINDERS);
-  const [pantryStock, setPantryStock] = useState(INITIAL_PANTRY_STOCK);
-  const [historicalLogs, setHistoricalLogs] = useState(getInitialHistoricalLogs());
+  // Zero Factory Presets: Collections initialize as empty arrays ([])
+  const [morningStacks, setMorningStacks] = useState([]);
+  const [peptideHistory, setPeptideHistory] = useState([]);
+  const [workoutPresets, setWorkoutPresets] = useState([]);
+  const [workoutReminders, setWorkoutReminders] = useState([]);
+  const [pantryStock, setPantryStock] = useState([]);
 
-  // Custom Morning Drink state with persistence
-  const [customMorningDrink, setCustomMorningDrink] = useState({
-    title: 'Electrolyte Collagen Elixir',
-    rawIngredientsText: `15g Wild Marine Collagen Peptides\n5g Creatine Monohydrate\n1 scoop Electrolyte Salts (Sodium 400mg, Potassium 200mg, Magnesium 100mg)\n500ml Filtered Water with 1/2 Organic Lemon\n3g Pure L-Glutamine powder`,
-    autoLogDaily: true,
-    nutrients: {
-      calories: 74,
-      protein: 18,
-      leucine: 0.41,
-      methionine: 0.18,
-      sodiumMg: 450,
-      potassiumMg: 200,
-      magnesiumMg: 100,
-      waterMl: 500
-    },
-    lastSaved: new Date().toISOString()
-  });
+  // Universal Unified Historical Log Array for retrospective CRUD
+  const [universalLogs, setUniversalLogs] = useState([]);
 
-  // Active ledger for today
+  // Active Ledger for Today (resets at 12:01 AM local time)
+  const [activeCycleKey, setActiveCycleKey] = useState(() => getActiveCycleDateKey());
+
   const [todayLog, setTodayLog] = useState({
-    date: getTodayDateStr(),
+    date: getActiveCycleDateKey(),
     meals: [],
     stacksLogged: [],
     workouts: [],
-    waterMl: 1400,
-    steps: 6840,
-    activeMinutes: 32,
+    waterMl: 0,
+    steps: 0,
+    activeMinutes: 0,
+    activeCalories: 0,
     syncStatus: 'pending',
     isEdited: false,
     lastModified: new Date().toISOString(),
-    mtorAlertPushed: false
+    mtorAlertPushed: false,
   });
 
-  // Persistent notifications feed
-  const [notifications, setNotifications] = useState([
-    {
-      id: 'notif-welcome',
-      type: 'sync',
-      title: 'Pixel 8 Health Suite Active',
-      message: 'State preservation active. Screen memory and background sync enabled.',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      unread: true
-    },
-    {
-      id: 'notif-gh',
-      type: 'sync',
-      title: 'Google Health Integration Paired',
-      message: 'Step count sensor connected. Live pedometer tracking active.',
-      timestamp: new Date(Date.now() - 1800000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      unread: true
-    }
-  ]);
+  const [notifications, setNotifications] = useState([]);
 
   // Load from LocalStorage on mount
   useEffect(() => {
     const cached = loadStoredState();
     if (cached) {
       if (cached.todayLog) setTodayLog(cached.todayLog);
-      if (cached.historicalLogs) setHistoricalLogs(cached.historicalLogs);
-      if (cached.morningStacks) setMorningStacks(cached.morningStacks);
-      if (cached.customMorningDrink) setCustomMorningDrink(cached.customMorningDrink);
+      if (Array.isArray(cached.morningStacks)) setMorningStacks(cached.morningStacks);
+      if (Array.isArray(cached.peptideHistory)) setPeptideHistory(cached.peptideHistory);
       if (cached.userProfile) setUserProfile(cached.userProfile);
-      if (cached.peptideHistory) setPeptideHistory(cached.peptideHistory);
-      if (cached.workoutPresets) setWorkoutPresets(cached.workoutPresets);
-      if (cached.workoutReminders) setWorkoutReminders(cached.workoutReminders);
-      if (cached.pantryStock) setPantryStock(cached.pantryStock);
-      if (cached.notifications) setNotifications(cached.notifications);
+      if (cached.hydrationGoalMl) setHydrationGoalMl(Number(cached.hydrationGoalMl) || 2500);
+      if (Array.isArray(cached.universalLogs)) setUniversalLogs(cached.universalLogs);
       if (cached.googleSheetsWebhookUrl) setGoogleSheetsWebhookUrl(cached.googleSheetsWebhookUrl);
-      if (cached.lastSyncTime) setLastSyncTime(cached.lastSyncTime);
     }
     setIsLoaded(true);
   }, []);
 
-  // Save to LocalStorage on state modifications
+  // Save to LocalStorage on modifications
   useEffect(() => {
     if (!isLoaded) return;
     saveStoredState({
       todayLog,
-      historicalLogs,
       morningStacks,
-      customMorningDrink,
-      userProfile,
       peptideHistory,
-      workoutPresets,
-      workoutReminders,
-      pantryStock,
-      notifications,
+      userProfile,
+      hydrationGoalMl,
+      universalLogs,
       googleSheetsWebhookUrl,
-      lastSyncTime
+      lastSyncTime,
     });
   }, [
     isLoaded,
     todayLog,
-    historicalLogs,
     morningStacks,
-    customMorningDrink,
-    userProfile,
     peptideHistory,
-    workoutPresets,
-    workoutReminders,
-    pantryStock,
-    notifications,
+    userProfile,
+    hydrationGoalMl,
+    universalLogs,
     googleSheetsWebhookUrl,
-    lastSyncTime
+    lastSyncTime,
   ]);
 
-  // Automated midnight archive detection & daily drink auto-log
+  // 12:01 AM Local Time Automatic Daily Reset Watcher
   useEffect(() => {
-    const checkMidnightArchive = () => {
-      const currentDate = getTodayDateStr();
-      if (todayLog.date && todayLog.date !== currentDate) {
-        setHistoricalLogs(prev => ({
-          ...prev,
-          [todayLog.date]: { ...todayLog }
-        }));
-
-        const freshMeals = [];
-        if (customMorningDrink.autoLogDaily && customMorningDrink.nutrients) {
-          freshMeals.push({
-            id: `meal-custom-drink-${Date.now()}`,
-            name: customMorningDrink.title,
-            category: 'Custom Morning Drink',
-            calories: customMorningDrink.nutrients.calories,
-            protein: customMorningDrink.nutrients.protein,
-            carbs: 2,
-            fat: 0,
-            leucine: customMorningDrink.nutrients.leucine,
-            methionine: customMorningDrink.nutrients.methionine,
-            source: 'custom_morning_drink',
-            timestamp: '07:00 AM'
-          });
-        }
-
+    const checkMidnightCycle = () => {
+      const currentCycle = getActiveCycleDateKey(new Date());
+      if (currentCycle !== activeCycleKey) {
+        setActiveCycleKey(currentCycle);
         setTodayLog({
-          date: currentDate,
-          meals: freshMeals,
+          date: currentCycle,
+          meals: [],
           stacksLogged: [],
           workouts: [],
-          waterMl: customMorningDrink.autoLogDaily ? (customMorningDrink.nutrients.waterMl || 500) : 0,
+          waterMl: 0,
           steps: 0,
           activeMinutes: 0,
+          activeCalories: 0,
           syncStatus: 'pending',
           isEdited: false,
           lastModified: new Date().toISOString(),
-          mtorAlertPushed: false
+          mtorAlertPushed: false,
         });
 
         addNotification({
           type: 'sync',
-          title: 'Automated Midnight Archive',
-          message: `Archived ledger for ${todayLog.date}. Prepared fresh daily tracking suite.`
+          title: '12:01 AM Cycle Reset',
+          message: `Active cycle shifted to ${currentCycle}. Summary counters reset to zero.`,
         });
       }
     };
 
-    checkMidnightArchive();
-    const interval = setInterval(checkMidnightArchive, 60000);
+    checkMidnightCycle();
+    const interval = setInterval(checkMidnightCycle, 15000);
     return () => clearInterval(interval);
-  }, [todayLog, customMorningDrink]);
+  }, [activeCycleKey]);
 
-  // Helper to append a notification
+  // Notification Appender
   const addNotification = useCallback(({ type, title, message }) => {
     const newNotif = {
       id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -248,290 +165,153 @@ export function AppProvider({ children }) {
       title,
       message,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      unread: true
+      unread: true,
     };
-    setNotifications(prev => [newNotif, ...prev.slice(0, 49)]);
+    setNotifications((prev) => [newNotif, ...prev.slice(0, 49)]);
   }, []);
 
-  // Computed today's totals
+  // Universal Log Operations
+  const addLogRecord = useCallback((entry) => {
+    const record = {
+      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      ...entry,
+    };
+    setUniversalLogs((prev) => [record, ...prev]);
+
+    // Also update today's live ledger
+    if (entry.category === 'WATER') {
+      setTodayLog((prev) => ({
+        ...prev,
+        waterMl: Math.max(0, prev.waterMl + (Number(entry.amountMl) || 0)),
+        lastModified: new Date().toISOString(),
+      }));
+    } else if (entry.category === 'NUTRITION') {
+      setTodayLog((prev) => ({
+        ...prev,
+        meals: [...prev.meals, record],
+        lastModified: new Date().toISOString(),
+      }));
+    } else if (entry.category === 'PEPTIDE') {
+      setPeptideHistory((prev) => [record, ...prev]);
+    } else if (entry.category === 'ACTIVITY') {
+      setTodayLog((prev) => ({
+        ...prev,
+        steps: prev.steps + (Number(entry.steps) || 0),
+        activeMinutes: prev.activeMinutes + (Number(entry.durationMin) || 0),
+        activeCalories: prev.activeCalories + (Number(entry.caloriesBurned) || 0),
+        lastModified: new Date().toISOString(),
+      }));
+    }
+
+    feedbackEngine.vibrate(15);
+    return record;
+  }, []);
+
+  const updateLogRecord = useCallback((id, updated) => {
+    setUniversalLogs((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...updated, lastModified: new Date().toISOString() } : item))
+    );
+
+    // Sync updates back to today's ledger if the entry is from today
+    setTodayLog((prev) => ({
+      ...prev,
+      meals: prev.meals.map((m) => (m.id === id ? { ...m, ...updated } : m)),
+      lastModified: new Date().toISOString(),
+    }));
+  }, []);
+
+  const deleteLogRecord = useCallback((id) => {
+    setUniversalLogs((prev) => prev.filter((item) => item.id !== id));
+    setTodayLog((prev) => ({
+      ...prev,
+      meals: prev.meals.filter((m) => m.id !== id),
+      lastModified: new Date().toISOString(),
+    }));
+    setPeptideHistory((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
+  // Today's Computed Totals
   const todayTotals = useMemo(() => {
     const totals = {
       calories: 0,
       protein: 0,
       carbs: 0,
       fat: 0,
-      leucine: 0,
-      methionine: 0
+      micros: { vitaminD: 0, vitaminC: 0, magnesium: 0, zinc: 0, potassium: 0, sodium: 0 },
+      aminos: {
+        leucine: 0,
+        isoleucine: 0,
+        valine: 0,
+        lysine: 0,
+        methionine: 0,
+        phenylalanine: 0,
+        threonine: 0,
+        tryptophan: 0,
+        histidine: 0,
+      },
+      waterMl: todayLog.waterMl,
+      steps: todayLog.steps,
+      activeMinutes: todayLog.activeMinutes,
+      activeCalories: todayLog.activeCalories,
     };
 
-    todayLog.meals.forEach(meal => {
+    todayLog.meals.forEach((meal) => {
       totals.calories += Number(meal.calories || 0);
       totals.protein += Number(meal.protein || 0);
       totals.carbs += Number(meal.carbs || 0);
-      totals.fat += Number(meal.fat || 0);
-      totals.leucine += Number(meal.leucine || 0);
-      totals.methionine += Number(meal.methionine || 0);
+      totals.fat += Number(meal.fats || meal.fat || 0);
+      totals.aminos.leucine += Number(meal.leucineMg || meal.aminos?.leucine || (meal.leucine ? meal.leucine * 1000 : 0) || 0);
+
+      ESSENTIAL_AMINO_ACIDS.forEach(({ key }) => {
+        if (key !== 'leucine') {
+          totals.aminos[key] += Number(meal.aminos?.[key] || (meal[key] ? meal[key] * 1000 : 0) || 0);
+        }
+      });
+
+      MICRONUTRIENT_FIELDS.forEach(({ key }) => {
+        totals.micros[key] += Number(meal.micros?.[key] || 0);
+      });
     });
-
-    totals.waterMl = Number(todayLog.waterMl || 0);
-    totals.steps = Number(todayLog.steps || 0);
-    totals.activeMinutes = Number(todayLog.activeMinutes || 0);
-
-    totals.leucine = Number(totals.leucine.toFixed(2));
-    totals.methionine = Number(totals.methionine.toFixed(2));
 
     return totals;
-  }, [todayLog.meals, todayLog.waterMl, todayLog.steps, todayLog.activeMinutes]);
-
-  // Progress metrics vs targets
-  const progressMetrics = useMemo(() => {
-    const calorieTarget = userProfile.dailyCaloricTarget || DAILY_TARGETS.calories;
-    const proteinTarget = userProfile.dailyProteinTarget || DAILY_TARGETS.protein;
-
-    return {
-      caloriesPct: Math.min(100, Math.round((todayTotals.calories / calorieTarget) * 100)),
-      proteinPct: Math.min(100, Math.round((todayTotals.protein / proteinTarget) * 100)),
-      waterPct: Math.min(100, Math.round((todayTotals.waterMl / DAILY_TARGETS.waterMl) * 100)),
-      stepsPct: Math.min(100, Math.round((todayTotals.steps / DAILY_TARGETS.steps) * 100)),
-      leucinePct: Math.min(100, Math.round((todayTotals.leucine / DAILY_TARGETS.leucineTarget) * 100)),
-      methioninePct: Math.min(100, Math.round((todayTotals.methionine / DAILY_TARGETS.methionineSafetyCeiling) * 100)),
-      isMethionineCaution: todayTotals.methionine >= 1.4,
-      isMethionineExceeded: todayTotals.methionine >= DAILY_TARGETS.methionineSafetyCeiling
-    };
-  }, [todayTotals, userProfile]);
-
-  // Automated mTOR Warning Push Notification
-  useEffect(() => {
-    if (progressMetrics.isMethionineCaution && !todayLog.mtorAlertPushed) {
-      setTodayLog(prev => ({ ...prev, mtorAlertPushed: true }));
-      addNotification({
-        type: 'mtor',
-        title: '⚠️ mTOR Safety Elevation Warning',
-        message: `Daily methionine reached ${todayTotals.methionine}g (safety threshold: 1.4g / limit: 1.8g). Favour plant proteins or collagen.`
-      });
-      feedbackEngine.playChime('alert');
-    }
-  }, [progressMetrics.isMethionineCaution, todayLog.mtorAlertPushed, todayTotals.methionine, addNotification]);
-
-  const unreadCount = useMemo(() => {
-    return notifications.filter(n => n.unread).length;
-  }, [notifications]);
+  }, [todayLog]);
 
   // Actions
-  const logMorningStack = useCallback((stackId) => {
-    const stack = morningStacks.find(s => s.id === stackId);
-    if (!stack) return;
-
-    const newMeal = {
-      id: `meal-stack-${Date.now()}`,
-      name: stack.name,
-      category: 'Morning Stack',
-      calories: stack.calories,
-      protein: stack.protein,
-      carbs: stack.carbs,
-      fat: stack.fat,
-      leucine: stack.leucine,
-      methionine: stack.methionine,
-      source: 'morning_stack',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    setTodayLog(prev => ({
-      ...prev,
-      meals: [...prev.meals, newMeal],
-      stacksLogged: [...(prev.stacksLogged || []), stackId],
-      syncStatus: 'pending',
-      lastModified: new Date().toISOString()
-    }));
-
-    feedbackEngine.playChime('stack');
-    feedbackEngine.triggerConfetti();
-
-    addNotification({
-      type: 'stack',
-      title: `Logged ${stack.name}`,
-      message: `+${stack.protein}g Protein | +${stack.leucine}g Leucine pulse added to active ledger.`
-    });
-  }, [morningStacks, addNotification]);
-
-  const logMeal = useCallback((mealData) => {
-    const newMeal = {
-      id: `meal-${Date.now()}`,
-      name: mealData.name || 'Custom Meal',
-      category: mealData.category || 'Nutritional Entry',
-      calories: Number(mealData.calories || 0),
-      protein: Number(mealData.protein || 0),
-      carbs: Number(mealData.carbs || 0),
-      fat: Number(mealData.fat || 0),
-      leucine: Number(mealData.leucine || 0),
-      methionine: Number(mealData.methionine || 0),
-      source: mealData.source || 'manual',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    setTodayLog(prev => ({
-      ...prev,
-      meals: [...prev.meals, newMeal],
-      syncStatus: 'pending',
-      lastModified: new Date().toISOString()
-    }));
-
-    feedbackEngine.playChime('scan');
-
-    addNotification({
-      type: 'nutrition',
-      title: `Logged: ${newMeal.name}`,
-      message: `${newMeal.calories} kcal | ${newMeal.protein}g protein logged.`
-    });
-  }, [addNotification]);
-
-  const deleteMeal = useCallback((mealId) => {
-    setTodayLog(prev => ({
-      ...prev,
-      meals: prev.meals.filter(m => m.id !== mealId),
-      syncStatus: 'pending',
-      lastModified: new Date().toISOString()
-    }));
-  }, []);
-
   const incrementWater = useCallback((amountMl = 250) => {
-    setTodayLog(prev => ({
-      ...prev,
-      waterMl: Math.max(0, prev.waterMl + amountMl),
-      syncStatus: 'pending',
-      lastModified: new Date().toISOString()
-    }));
-    feedbackEngine.vibrate(15);
-  }, []);
-
-  const updateSteps = useCallback((amount = 500) => {
-    setTodayLog(prev => ({
-      ...prev,
-      steps: Math.max(0, prev.steps + amount),
-      syncStatus: 'pending',
-      lastModified: new Date().toISOString()
-    }));
-    feedbackEngine.vibrate(15);
-  }, []);
-
-  const syncGoogleHealthSteps = useCallback(() => {
-    const bonus = 1250;
-    setTodayLog(prev => ({
-      ...prev,
-      steps: prev.steps + bonus,
-      syncStatus: 'pending',
-      lastModified: new Date().toISOString()
-    }));
-    feedbackEngine.playChime('sync');
-    addNotification({
-      type: 'sync',
-      title: 'Google Health Synced',
-      message: `Synchronised +${bonus} steps from Pixel 8 device pedometer.`
+    addLogRecord({
+      category: 'WATER',
+      title: `Hydration (+${amountMl} ml)`,
+      amountMl,
+      summary: `${amountMl} ml water intake`,
     });
-  }, [addNotification]);
+  }, [addLogRecord]);
+
+  const logMorningStack = useCallback((stack) => {
+    if (!stack) return;
+    addLogRecord({
+      category: 'NUTRITION',
+      title: `Stack: ${stack.name}`,
+      calories: stack.totals?.calories || 0,
+      protein: stack.totals?.protein || 0,
+      carbs: stack.totals?.carbs || 0,
+      fats: stack.totals?.fats || 0,
+      leucineMg: stack.totals?.aminos?.leucine || 0,
+      aminos: stack.totals?.aminos || {},
+      micros: stack.totals?.micros || {},
+      summary: `${stack.totals?.calories || 0} kcal • ${stack.totals?.protein || 0}g P • Leucine: ${stack.totals?.aminos?.leucine || 0}mg`,
+    });
+    feedbackEngine.playChime('stack');
+  }, [addLogRecord]);
 
   const updateUserProfile = useCallback((newProfile) => {
-    setUserProfile(prev => ({ ...prev, ...newProfile }));
+    setUserProfile((prev) => ({ ...prev, ...newProfile }));
     addNotification({
       type: 'sync',
       title: 'Profile Updated',
-      message: 'Biometric parameters and personal profile calibration saved.'
+      message: 'Biometric parameters and calibration saved.',
     });
   }, [addNotification]);
-
-  const addPeptideHistoryEntry = useCallback((entry) => {
-    setPeptideHistory(prev => [entry, ...prev]);
-  }, []);
-
-  const deletePeptideHistoryEntry = useCallback((id) => {
-    setPeptideHistory(prev => prev.filter(e => e.id !== id));
-  }, []);
-
-  const updateCustomMorningDrink = useCallback((drinkData) => {
-    setCustomMorningDrink(drinkData);
-  }, []);
-
-  const submitLog = useCallback(async () => {
-    setIsSyncing(true);
-    feedbackEngine.vibrate([15, 30]);
-
-    const batchPayload = {
-      date: todayLog.date,
-      summary: {
-        totalCalories: todayTotals.calories,
-        totalProtein: todayTotals.protein,
-        totalCarbs: todayTotals.carbs,
-        totalFat: todayTotals.fat,
-        totalLeucine: todayTotals.leucine,
-        totalMethionine: todayTotals.methionine,
-        waterMl: todayTotals.waterMl,
-        steps: todayTotals.steps,
-        activeMinutes: todayTotals.activeMinutes
-      },
-      meals: todayLog.meals,
-      workouts: todayLog.workouts,
-      peptideHistory,
-      userProfile,
-      device: 'Google Pixel 8',
-      syncedAt: new Date().toISOString()
-    };
-
-    const result = await syncBatchToGoogleSheets(batchPayload, googleSheetsWebhookUrl);
-
-    setIsSyncing(false);
-    const syncTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setLastSyncTime(syncTimeStr);
-
-    if (result.success) {
-      setTodayLog(prev => ({ ...prev, syncStatus: 'synced' }));
-      feedbackEngine.playChime('sync');
-      addNotification({
-        type: 'sync',
-        title: 'Batch Synchronisation Successful',
-        message: result.mode === 'live_sheets_webhook'
-          ? 'Transmitted payload to Google Sheets webhook endpoint.'
-          : 'Cached in verified local JSON ledger.'
-      });
-    }
-
-    return result;
-  }, [todayLog, todayTotals, peptideHistory, userProfile, googleSheetsWebhookUrl, addNotification]);
-
-  const updateHistoricalDay = useCallback((dateStr, updatedDay) => {
-    setHistoricalLogs(prev => ({
-      ...prev,
-      [dateStr]: {
-        ...prev[dateStr],
-        ...updatedDay,
-        isEdited: true,
-        lastModified: new Date().toISOString()
-      }
-    }));
-
-    feedbackEngine.playChime('sync');
-
-    addNotification({
-      type: 'sync',
-      title: `Retroactive Record Updated`,
-      message: `Modified entries for ${dateStr}. Historical chart badge applied.`
-    });
-  }, [addNotification]);
-
-  const exportBackup = useCallback(() => {
-    exportHealthBackupJSON({
-      todayLog,
-      historicalLogs,
-      morningStacks,
-      customMorningDrink,
-      userProfile,
-      peptideHistory,
-      workoutPresets,
-      workoutReminders,
-      pantryStock,
-      notifications,
-      exportedAt: new Date().toISOString()
-    });
-  }, [todayLog, historicalLogs, morningStacks, customMorningDrink, userProfile, peptideHistory, workoutPresets, workoutReminders, pantryStock, notifications]);
 
   const value = {
     activeTab,
@@ -548,47 +328,28 @@ export function AppProvider({ children }) {
     lastSyncTime,
     isGoogleHealthConnected,
     setIsGoogleHealthConnected,
-
     userProfile,
     updateUserProfile,
-    peptideHistory,
-    addPeptideHistoryEntry,
-    deletePeptideHistoryEntry,
-
+    hydrationGoalMl,
+    setHydrationGoalMl,
     morningStacks,
-    customMorningDrink,
-    workoutPresets,
-    workoutReminders,
-    pantryStock,
-    historicalLogs,
+    setMorningStacks,
+    peptideHistory,
+    setPeptideHistory,
+    universalLogs,
+    addLogRecord,
+    updateLogRecord,
+    deleteLogRecord,
     todayLog,
     todayTotals,
-    progressMetrics,
-    notifications,
-    unreadCount,
-
-    // Actions
-    logMorningStack,
-    logMeal,
-    deleteMeal,
     incrementWater,
-    updateSteps,
-    syncGoogleHealthSteps,
-    updateCustomMorningDrink,
-    submitLog,
-    updateHistoricalDay,
-    updateMorningStacks: setMorningStacks,
-    markAllNotificationsAsRead: () => setNotifications(prev => prev.map(n => ({ ...n, unread: false }))),
-    clearNotifications: () => setNotifications([]),
-    exportBackup,
-    addNotification
+    logMorningStack,
+    activeCycleKey,
+    notifications,
+    addNotification,
   };
 
-  return (
-    <AppContext.Provider value={value}>
-      {children}
-    </AppContext.Provider>
-  );
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {
