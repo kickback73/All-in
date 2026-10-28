@@ -1,5 +1,5 @@
 // src/components/MtorMonitor.jsx
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Activity, Sparkles, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { ESSENTIAL_AMINO_ACIDS } from '../data/initialData';
 
@@ -11,10 +11,9 @@ export function calculate24HourMtorTimeline(meals = [], plannedStacks = [], curr
   const points = [];
 
   for (let hour = 0; hour < 24; hour++) {
-    let actualActivation = 14; // Basal fasting autophagy floor (~14%)
+    let actualActivation = 14;
     let projectedActivation = 14;
 
-    // Actual logged meals impact
     meals.forEach((meal) => {
       let mealHour = 8;
       if (meal.timestamp) {
@@ -28,7 +27,6 @@ export function calculate24HourMtorTimeline(meals = [], plannedStacks = [], curr
         const leucineG = (Number(meal.leucineMg) || Number(meal.protein) * 80 || 0) / 1000;
         const carbsG = Number(meal.carbs) || 0;
         const amplitude = Math.min(82, leucineG * 26 + carbsG * 0.35);
-        // Absorption peak at ~1.25h, decaying over 5.5h
         const impulse = amplitude * (dt / 1.25) * Math.exp(1 - dt / 1.25);
         actualActivation += Math.max(0, impulse);
       }
@@ -36,7 +34,6 @@ export function calculate24HourMtorTimeline(meals = [], plannedStacks = [], curr
 
     projectedActivation = actualActivation;
 
-    // Projected future planned stacks
     plannedStacks
       .filter((s) => s.isRecurringPlanned && s.scheduledHour)
       .forEach((stack) => {
@@ -67,7 +64,12 @@ export default function MtorMonitor({
   aminoTotals = {},
   todayMeals = [],
   plannedStacks = [],
+  onLogAminoPulse,
 }) {
+  const [pulseName, setPulseName] = useState('EAA / Collagen Amino Entry');
+  const [leucineMg, setLeucineMg] = useState(500);
+  const [methionineMg, setMethionineMg] = useState(120);
+
   const currentHour = new Date().getHours();
   const timeline = useMemo(
     () => calculate24HourMtorTimeline(todayMeals, plannedStacks, currentHour),
@@ -79,8 +81,8 @@ export default function MtorMonitor({
   const isAutophagyWindow = currentLevel <= 25;
 
   const leucineGrams = ((aminoTotals.leucine || 0) / 1000).toFixed(2);
+  const methionineGrams = ((aminoTotals.methionine || 0) / 1000).toFixed(2);
 
-  // SVG Radar Coordinates
   const radarCoords = useMemo(() => {
     const cx = 100;
     const cy = 100;
@@ -104,15 +106,15 @@ export default function MtorMonitor({
 
   return (
     <div className="space-y-3.5 text-slate-900">
-      {/* Dynamic Status Notification Pill */}
+      {/* Status Banner */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span
           className={`px-3 py-1 rounded-full text-[11px] font-black uppercase border flex items-center gap-1.5 ${
             isElevated
-              ? 'bg-amber-100/90 text-amber-900 border-amber-300'
+              ? 'bg-amber-100 text-amber-900 border-amber-300'
               : isAutophagyWindow
-              ? 'bg-emerald-100/90 text-emerald-900 border-emerald-300'
-              : 'bg-sky-100/90 text-sky-900 border-sky-300'
+              ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+              : 'bg-sky-100 text-sky-900 border-sky-300'
           }`}
         >
           {isElevated ? (
@@ -133,13 +135,13 @@ export default function MtorMonitor({
           )}
         </span>
 
-        <span className="text-[11px] font-bold text-slate-700 bg-white/80 px-2.5 py-0.5 rounded-full border border-slate-200/80">
-          Leucine: <strong className="text-slate-900">{leucineGrams}g</strong> (&lt;2.0g NHL Guard)
+        <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-full">
+          Leu: <strong>{leucineGrams}g</strong> • Met: <strong>{methionineGrams}g / 1.8g</strong>
         </span>
       </div>
 
-      {/* 1. 24-Hour Metabolic mTOR Signaling Graph (Full Width on Pixel 8) */}
-      <div className="rounded-2xl bg-white/75 backdrop-blur-[2px] border border-slate-200/80 p-3.5 space-y-2 shadow-2xs">
+      {/* 1. 24-Hour Metabolic mTOR Signaling Graph */}
+      <div className="rounded-2xl bg-[#F4F8FB] border border-slate-200 p-3.5 space-y-2">
         <div className="flex items-center justify-between gap-1">
           <span className="text-[11px] font-extrabold uppercase text-slate-800">
             24h mTORC1 & Autophagy Curve
@@ -155,7 +157,6 @@ export default function MtorMonitor({
         </div>
 
         <svg viewBox="0 0 360 140" className="w-full h-36 overflow-visible">
-          {/* Elevated Anabolic Threshold (55%) */}
           <line
             x1="20"
             y1={115 - 0.55 * 95}
@@ -169,7 +170,6 @@ export default function MtorMonitor({
             Elevated Anabolic Threshold (NHL Remission Ceiling 55%)
           </text>
 
-          {/* Autophagy Trough Zone (<25%) */}
           <rect
             x="20"
             y={115 - 0.25 * 95}
@@ -181,7 +181,6 @@ export default function MtorMonitor({
             Favourable Autophagy Trough Zone (&lt;25%)
           </text>
 
-          {/* Plot Lines & Area */}
           {(() => {
             const xStep = 332 / 23;
             const projPts = timeline.map((pt, i) => ({
@@ -223,7 +222,6 @@ export default function MtorMonitor({
             );
           })()}
 
-          {/* X-Axis Hour Markers */}
           {[0, 6, 12, 18, 23].map((h) => (
             <text
               key={h}
@@ -238,8 +236,8 @@ export default function MtorMonitor({
         </svg>
       </div>
 
-      {/* 2. Multi-Spectrum 9-Axis Amino Acid Radar / Spider Chart */}
-      <div className="rounded-2xl bg-white/75 backdrop-blur-[2px] border border-slate-200/80 p-3.5 flex items-center justify-between gap-3 shadow-2xs">
+      {/* 2. 9-Axis Amino Acid Radar Chart */}
+      <div className="rounded-2xl bg-[#F4F8FB] border border-slate-200 p-3.5 flex items-center justify-between gap-3">
         <div className="w-36 h-36 shrink-0">
           <svg viewBox="0 0 200 200" className="w-full h-full">
             {[24, 48, 72].map((r) => (
@@ -292,7 +290,7 @@ export default function MtorMonitor({
             {ESSENTIAL_AMINO_ACIDS.slice(0, 6).map((aa) => (
               <div
                 key={aa.key}
-                className="rounded-lg bg-white/80 border border-slate-200/70 px-2 py-1 flex items-center justify-between"
+                className="rounded-lg bg-white border border-slate-200 px-2 py-1 flex items-center justify-between"
               >
                 <span className="text-[10px] font-bold text-slate-600">
                   {aa.label.slice(0, 3).toUpperCase()}
@@ -305,6 +303,60 @@ export default function MtorMonitor({
           </div>
         </div>
       </div>
+
+      {/* 3. Direct Amino Acid / Leucine / Methionine Data Entry Form */}
+      {onLogAminoPulse && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onLogAminoPulse({
+              title: pulseName,
+              leucineMg: Number(leucineMg) || 0,
+              methionineMg: Number(methionineMg) || 0,
+            });
+          }}
+          className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-3 space-y-2.5"
+        >
+          <div className="text-[11px] font-black uppercase text-indigo-950">
+            Log Direct Amino / Leucine / Methionine Entry
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="block text-[9px] font-bold text-slate-600">Label</label>
+              <input
+                type="text"
+                value={pulseName}
+                onChange={(e) => setPulseName(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold"
+              />
+            </div>
+            <div>
+              <label className="block text-[9px] font-bold text-slate-600">Leucine (mg)</label>
+              <input
+                type="number"
+                value={leucineMg}
+                onChange={(e) => setLeucineMg(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-black"
+              />
+            </div>
+            <div>
+              <label className="block text-[9px] font-bold text-slate-600">Methionine (mg)</label>
+              <input
+                type="number"
+                value={methionineMg}
+                onChange={(e) => setMethionineMg(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-black"
+              />
+            </div>
+          </div>
+          <button
+            type="submit"
+            className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold cursor-pointer"
+          >
+            Record Amino Acid Entry
+          </button>
+        </form>
+      )}
     </div>
   );
 }
