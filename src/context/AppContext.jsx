@@ -2,12 +2,53 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { VISUAL_ASSET_LIBRARY } from '../utils/backgroundEngine';
 import { DANS_MORNING_STACK } from '../utils/nutrientEngine';
+import {
+  registerAllInServiceWorker,
+  triggerDeviceNotification,
+} from '../utils/notificationService';
 
 const AppContext = createContext();
 
+function toIsoDateKey(d = new Date()) {
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `${yr}-${mo}-${da}`;
+}
+
+function buildInitialCalendarSchedule() {
+  const today = new Date();
+  const scheduled = {};
+  const completed = {};
+
+  for (let offset = -6; offset <= 7; offset++) {
+    const dt = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
+    const key = toIsoDateKey(dt);
+    const dow = dt.getDay(); // Mon(1), Wed(3), Fri(5), Sat(6) scheduled
+    if (dow === 1 || dow === 3 || dow === 5 || dow === 6) {
+      scheduled[key] = true;
+      if (offset === 0 || offset === -1 || offset === -3 || offset === -5) {
+        completed[key] = true;
+      }
+      // Leave offset -2 or -4 scheduled without completion so "Missed" red state is clearly visible
+    }
+  }
+  // Ensure at least one past day is scheduled & missed (red) and today is scheduled & completed (green)
+  const twoDaysAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 2);
+  const twoDaysAgoKey = toIsoDateKey(twoDaysAgo);
+  scheduled[twoDaysAgoKey] = true;
+  delete completed[twoDaysAgoKey];
+
+  const todayKey = toIsoDateKey(today);
+  scheduled[todayKey] = true;
+  completed[todayKey] = true;
+
+  return { scheduled, completed };
+}
+
 const INITIAL_NUTRITION = {
   calories: 0,
-  targetCalories: 1900, // 1,850–1,950 kcal/day (calibrated to preserve facial fat pads and lean tissue)
+  targetCalories: 1900, // 1,850–1,950 kcal/day
   protein: 0,
   targetProtein: 180, // 170–190 g/day
   carbs: 0,
@@ -37,6 +78,27 @@ const INITIAL_NUTRITION = {
     tryptophan: 0,
     histidine: 0,
   },
+  targets: {
+    micros: {
+      vitaminD: 50,
+      vitaminC: 120,
+      magnesium: 420,
+      zinc: 15,
+      potassium: 3400,
+      sodium: 2300,
+    },
+    aminos: {
+      leucine: 3000,
+      isoleucine: 1500,
+      valine: 1800,
+      lysine: 2400,
+      methionine: 1200,
+      phenylalanine: 1600,
+      threonine: 1400,
+      tryptophan: 400,
+      histidine: 900,
+    },
+  },
 };
 
 const INITIAL_HYDRATION = {
@@ -46,6 +108,8 @@ const INITIAL_HYDRATION = {
   creatineGrams: 0,
 };
 
+const initialCal = buildInitialCalendarSchedule();
+
 const INITIAL_ACTIVITY = {
   steps: 4200,
   targetSteps: 8500,
@@ -53,12 +117,15 @@ const INITIAL_ACTIVITY = {
   targetActiveMinutes: 45,
   caloriesBurned: 245,
   workoutType: 'Spin Bike (Zone 2) + Resistance Bands + Ab Wheel',
+  scheduledDates: initialCal.scheduled,
+  completedDates: initialCal.completed,
   trainingLogs: [
     {
       id: 'init_spin_1',
       type: 'Spin Bike',
       summary: '25 min • 114 BPM (Zone 2 Fat Burn)',
       calories: 185,
+      dateKey: toIsoDateKey(new Date()),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
     {
@@ -66,6 +133,7 @@ const INITIAL_ACTIVITY = {
       type: 'Resistance Bands',
       summary: 'Back/V-Taper • 60 lbs × 12 reps × 3 sets',
       calories: 42,
+      dateKey: toIsoDateKey(new Date()),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
     {
@@ -73,6 +141,7 @@ const INITIAL_ACTIVITY = {
       type: 'Ab Wheel Rollouts',
       summary: 'Kneeling • 229 lbs • 12 reps × 3 sets',
       calories: 18,
+      dateKey: toIsoDateKey(new Date()),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ],
@@ -89,7 +158,7 @@ const INITIAL_PEPTIDE_HISTORY = [
     volumeMl: '0.600',
     syringeUnits: '60.0',
     syringeCapacityMl: 1.0,
-    site: 'Lower Left Abdomen',
+    site: 'Belly button area - lower left',
     dateTime: new Date().toISOString().slice(0, 16),
     timestamp: new Date().toLocaleString([], {
       month: 'short',
@@ -102,7 +171,7 @@ const INITIAL_PEPTIDE_HISTORY = [
 
 export const AppProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(() => {
-    const saved = localStorage.getItem('allIn_userProfile_v5');
+    const saved = localStorage.getItem('allIn_userProfile_v6');
     return saved
       ? JSON.parse(saved)
       : {
@@ -112,33 +181,60 @@ export const AppProvider = ({ children }) => {
           height: '5\'11"',
           weightLbs: 229,
           goalWeightLbs: 200,
-          maxHr: 167, // 220 - 53
+          maxHr: 167,
           activityMultiplier: 1.375,
           dietaryFocus: 'High-Protein Recomp • Facial Fat Pad Preservation • NHL Remission Safe',
           remissionStatus: 'NHL Remission (Strict Anti-Angiogenic Guardrail)',
           activeProtocol: 'Retatrutide 3 mg once weekly',
+          notificationsEnabled: true,
           selectedPhotoId: VISUAL_ASSET_LIBRARY[0].id,
           customPhotoUrl: '',
         };
   });
 
   const [dailyNutrition, setDailyNutrition] = useState(() => {
-    const saved = localStorage.getItem('allIn_dailyNutrition_v5');
-    return saved ? JSON.parse(saved) : INITIAL_NUTRITION;
+    const saved = localStorage.getItem('allIn_dailyNutrition_v6');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        ...INITIAL_NUTRITION,
+        ...parsed,
+        targets: {
+          micros: {
+            ...INITIAL_NUTRITION.targets.micros,
+            ...(parsed?.targets?.micros || {}),
+          },
+          aminos: {
+            ...INITIAL_NUTRITION.targets.aminos,
+            ...(parsed?.targets?.aminos || {}),
+          },
+        },
+      };
+    }
+    return INITIAL_NUTRITION;
   });
 
   const [dailyHydration, setDailyHydration] = useState(() => {
-    const saved = localStorage.getItem('allIn_dailyHydration_v5');
+    const saved = localStorage.getItem('allIn_dailyHydration_v6');
     return saved ? JSON.parse(saved) : INITIAL_HYDRATION;
   });
 
   const [dailyActivity, setDailyActivity] = useState(() => {
-    const saved = localStorage.getItem('allIn_dailyActivity_v5');
-    return saved ? JSON.parse(saved) : INITIAL_ACTIVITY;
+    const saved = localStorage.getItem('allIn_dailyActivity_v6');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        ...INITIAL_ACTIVITY,
+        ...parsed,
+        scheduledDates: parsed.scheduledDates || INITIAL_ACTIVITY.scheduledDates,
+        completedDates: parsed.completedDates || INITIAL_ACTIVITY.completedDates,
+      };
+    }
+    return INITIAL_ACTIVITY;
   });
 
   const [savedStacks, setSavedStacks] = useState(() => {
-    const saved = localStorage.getItem('allIn_savedStacks_v5');
+    const saved = localStorage.getItem('allIn_savedStacks_v6');
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -147,17 +243,17 @@ export const AppProvider = ({ children }) => {
   });
 
   const [peptideHistory, setPeptideHistory] = useState(() => {
-    const saved = localStorage.getItem('allIn_peptideHistory_v5');
+    const saved = localStorage.getItem('allIn_peptideHistory_v6');
     return saved ? JSON.parse(saved) : INITIAL_PEPTIDE_HISTORY;
   });
 
   const [historicalLogs, setHistoricalLogs] = useState(() => {
-    const saved = localStorage.getItem('allIn_historicalLogs_v5');
+    const saved = localStorage.getItem('allIn_historicalLogs_v6');
     return saved ? JSON.parse(saved) : [];
   });
 
   const [mtorState, setMtorState] = useState(() => {
-    const saved = localStorage.getItem('allIn_mtorState_v5');
+    const saved = localStorage.getItem('allIn_mtorState_v6');
     return saved
       ? JSON.parse(saved)
       : {
@@ -174,38 +270,43 @@ export const AppProvider = ({ children }) => {
 
   // Persist all state slices
   useEffect(() => {
-    localStorage.setItem('allIn_userProfile_v5', JSON.stringify(userProfile));
+    localStorage.setItem('allIn_userProfile_v6', JSON.stringify(userProfile));
   }, [userProfile]);
 
   useEffect(() => {
-    localStorage.setItem('allIn_dailyNutrition_v5', JSON.stringify(dailyNutrition));
+    localStorage.setItem('allIn_dailyNutrition_v6', JSON.stringify(dailyNutrition));
   }, [dailyNutrition]);
 
   useEffect(() => {
-    localStorage.setItem('allIn_dailyHydration_v5', JSON.stringify(dailyHydration));
+    localStorage.setItem('allIn_dailyHydration_v6', JSON.stringify(dailyHydration));
   }, [dailyHydration]);
 
   useEffect(() => {
-    localStorage.setItem('allIn_dailyActivity_v5', JSON.stringify(dailyActivity));
+    localStorage.setItem('allIn_dailyActivity_v6', JSON.stringify(dailyActivity));
   }, [dailyActivity]);
 
   useEffect(() => {
-    localStorage.setItem('allIn_savedStacks_v5', JSON.stringify(savedStacks));
+    localStorage.setItem('allIn_savedStacks_v6', JSON.stringify(savedStacks));
   }, [savedStacks]);
 
   useEffect(() => {
-    localStorage.setItem('allIn_peptideHistory_v5', JSON.stringify(peptideHistory));
+    localStorage.setItem('allIn_peptideHistory_v6', JSON.stringify(peptideHistory));
   }, [peptideHistory]);
 
   useEffect(() => {
-    localStorage.setItem('allIn_historicalLogs_v5', JSON.stringify(historicalLogs));
+    localStorage.setItem('allIn_historicalLogs_v6', JSON.stringify(historicalLogs));
   }, [historicalLogs]);
 
   useEffect(() => {
-    localStorage.setItem('allIn_mtorState_v5', JSON.stringify(mtorState));
+    localStorage.setItem('allIn_mtorState_v6', JSON.stringify(mtorState));
   }, [mtorState]);
 
-  // Update mTOR state automatically when protein/leucine or workouts change
+  // Register Service Worker on mount for native PWA WebAPK & Web Push Notifications
+  useEffect(() => {
+    registerAllInServiceWorker();
+  }, []);
+
+  // Update mTOR state automatically when protein/leucine changes
   useEffect(() => {
     const leucineGrams = Number(((dailyNutrition.aminos?.leucine || 0) / 1000).toFixed(2));
     setMtorState((prev) => {
@@ -225,7 +326,6 @@ export const AppProvider = ({ children }) => {
     });
   }, [dailyNutrition.protein, dailyNutrition.aminos?.leucine]);
 
-  // Perform persistent sync snapshot (called on launch & at 00:00:00 midnight)
   const executePersistentSync = useCallback(
     (reason = 'launch') => {
       const now = new Date();
@@ -240,7 +340,7 @@ export const AppProvider = ({ children }) => {
         peptideHistory,
         mtorState,
       };
-      localStorage.setItem('allIn_cloudSyncSnapshot_v5', JSON.stringify(syncPayload));
+      localStorage.setItem('allIn_cloudSyncSnapshot_v6', JSON.stringify(syncPayload));
       setLastSyncedAt(now.toISOString());
 
       if (reason === 'midnight') {
@@ -262,6 +362,12 @@ export const AppProvider = ({ children }) => {
         };
         setHistoricalLogs((prev) => [snapshotEntry, ...prev]);
         setSyncStatusBadge(`Midnight sync complete (${timeLabel}) • Scheduled 00:00`);
+        if (userProfile.notificationsEnabled) {
+          triggerDeviceNotification(
+            'All In — Midnight Sync Complete',
+            'Your daily nutrition, hydration, and training logs have been archived.'
+          );
+        }
       } else if (reason === 'manual') {
         setSyncStatusBadge(`Synced ${timeLabel} • Midnight sync scheduled`);
       } else {
@@ -271,9 +377,8 @@ export const AppProvider = ({ children }) => {
     [userProfile, dailyNutrition, dailyHydration, dailyActivity, peptideHistory, mtorState]
   );
 
-  // 1. Automatic Sync on App Mount + Daily Local Midnight (00:00:00) Scheduler
+  // Automatic Sync on App Mount + Daily Local Midnight (00:00:00) Scheduler
   useEffect(() => {
-    // Immediate sync on mount
     executePersistentSync('launch');
 
     let midnightTimeoutId = null;
@@ -293,7 +398,7 @@ export const AppProvider = ({ children }) => {
 
       midnightTimeoutId = setTimeout(() => {
         executePersistentSync('midnight');
-        scheduleNextMidnightSync(); // Reschedule daily for the following midnight
+        scheduleNextMidnightSync();
       }, msUntilMidnight);
     };
 
@@ -373,11 +478,26 @@ export const AppProvider = ({ children }) => {
         currentMl: prev.currentMl + Number(stackTotals.waterMl),
       }));
     }
+
+    if (userProfile.notificationsEnabled && itemName) {
+      triggerDeviceNotification(
+        'All In — Nutrition Logged',
+        `${itemName}: +${Math.round(Number(stackTotals.calories) || 0)} kcal, +${
+          Number(stackTotals.protein) || 0
+        }g Protein`
+      );
+    }
   };
 
   // Peptide CRUD handlers
   const addPeptideEntry = (entry) => {
     setPeptideHistory((prev) => [entry, ...prev]);
+    if (userProfile.notificationsEnabled) {
+      triggerDeviceNotification(
+        'All In — Dose Logged',
+        `${entry.peptideName}: ${entry.desiredDoseValue}${entry.desiredDoseUnit} at ${entry.site}`
+      );
+    }
   };
 
   const updatePeptideEntry = (id, updatedFields) => {
@@ -390,23 +510,61 @@ export const AppProvider = ({ children }) => {
     setPeptideHistory((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Athletic Training Session Logger
-  const addTrainingSession = ({ type, summary, calories, durationMinutes = 0 }) => {
+  // Athletic Training Session Logger & Schedule Calendar Toggles
+  const addTrainingSession = ({ type, summary, calories, durationMinutes = 0, dateKey }) => {
     const kcal = Math.max(1, Math.round(Number(calories) || 0));
     const mins = Math.max(0, Math.round(Number(durationMinutes) || 0));
+    const targetDateKey = dateKey || toIsoDateKey(new Date());
     const newSession = {
       id: `train_${Date.now()}`,
       type,
       summary,
       calories: kcal,
+      dateKey: targetDateKey,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
     setDailyActivity((prev) => ({
       ...prev,
       caloriesBurned: (Number(prev.caloriesBurned) || 0) + kcal,
       activeMinutes: (Number(prev.activeMinutes) || 0) + mins,
+      completedDates: {
+        ...(prev.completedDates || {}),
+        [targetDateKey]: true,
+      },
       trainingLogs: [newSession, ...(prev.trainingLogs || [])],
     }));
+
+    if (userProfile.notificationsEnabled) {
+      triggerDeviceNotification(
+        'All In — Workout Completed',
+        `${type}: ${kcal} kcal burned (${summary})`
+      );
+    }
+  };
+
+  const toggleCalendarDateStatus = (dateKey) => {
+    setDailyActivity((prev) => {
+      const isSched = Boolean(prev.scheduledDates?.[dateKey]);
+      const isComp = Boolean(prev.completedDates?.[dateKey]);
+      const nextScheduled = { ...(prev.scheduledDates || {}) };
+      const nextCompleted = { ...(prev.completedDates || {}) };
+
+      // Cycle: Unscheduled -> Scheduled -> Scheduled + Completed -> Unscheduled
+      if (!isSched && !isComp) {
+        nextScheduled[dateKey] = true;
+      } else if (isSched && !isComp) {
+        nextCompleted[dateKey] = true;
+      } else {
+        delete nextScheduled[dateKey];
+        delete nextCompleted[dateKey];
+      }
+
+      return {
+        ...prev,
+        scheduledDates: nextScheduled,
+        completedDates: nextCompleted,
+      };
+    });
   };
 
   const deleteTrainingSession = (id) => {
@@ -421,7 +579,6 @@ export const AppProvider = ({ children }) => {
     });
   };
 
-  // Archive today's log manually & reset
   const archiveDailyLog = () => {
     const snapshot = {
       id: `log_${Date.now()}`,
@@ -440,9 +597,24 @@ export const AppProvider = ({ children }) => {
       peptidesLogged: peptideHistory.slice(0, 5),
     };
     setHistoricalLogs((prev) => [snapshot, ...prev]);
-    setDailyNutrition(INITIAL_NUTRITION);
-    setDailyHydration(INITIAL_HYDRATION);
-    setDailyActivity(INITIAL_ACTIVITY);
+    setDailyNutrition((prev) => ({
+      ...INITIAL_NUTRITION,
+      targetCalories: prev.targetCalories,
+      targetProtein: prev.targetProtein,
+      targetCarbs: prev.targetCarbs,
+      targetFiber: prev.targetFiber,
+      targetFats: prev.targetFats,
+      targets: prev.targets,
+    }));
+    setDailyHydration((prev) => ({
+      ...INITIAL_HYDRATION,
+      targetMl: prev.targetMl,
+    }));
+    setDailyActivity((prev) => ({
+      ...INITIAL_ACTIVITY,
+      scheduledDates: prev.scheduledDates,
+      completedDates: prev.completedDates,
+    }));
     executePersistentSync('manual');
   };
 
@@ -466,6 +638,7 @@ export const AppProvider = ({ children }) => {
         deletePeptideEntry,
         addTrainingSession,
         deleteTrainingSession,
+        toggleCalendarDateStatus,
         historicalLogs,
         setHistoricalLogs,
         mtorState,

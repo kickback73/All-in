@@ -18,6 +18,7 @@ import {
   scaleNutrients,
 } from '../utils/nutrientEngine';
 import { TILE_BACKGROUNDS } from '../utils/backgroundEngine';
+import PersistentAllowanceChart from './PersistentAllowanceChart';
 
 export const STACK_CATEGORIES = [
   'Morning Stacks',
@@ -271,27 +272,27 @@ export default function StackManager({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-3 overflow-y-auto">
-      <div className="relative rounded-3xl shadow-2xl border border-white/15 w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden text-white bg-slate-950">
-        {/* Consistent Tile Background Image + Dark Glass Backdrop */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-3 overflow-y-auto">
+      <div className="relative rounded-3xl shadow-2xl border border-white/25 w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden text-white bg-slate-950/40">
+        {/* Persistent Visible Tile Background Image (No opaque color wash) */}
         <img
           src={TILE_BACKGROUNDS.stacks}
           alt="Get Stacked Backdrop"
-          className="absolute inset-0 w-full h-full object-cover object-center opacity-25 pointer-events-none"
+          className="absolute inset-0 w-full h-full object-cover object-center opacity-90 pointer-events-none"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/92 to-slate-950/95 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/45 via-slate-950/55 to-slate-950/75 pointer-events-none" />
 
         {/* Top Header */}
-        <div className="relative z-10 px-4 py-3.5 bg-slate-900/90 border-b border-white/15 flex items-center justify-between">
+        <div className="relative z-10 px-4 py-3.5 bg-slate-950/65 backdrop-blur-md border-b border-white/20 flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="p-2 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-300 shrink-0">
+            <div className="p-2 rounded-2xl bg-amber-500/25 border border-amber-400/50 text-amber-300 shrink-0">
               <Layers className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-black text-white truncate">
+              <h2 className="text-sm font-black text-white drop-shadow truncate">
                 {editingStackId ? 'Edit Stack — Get Stacked' : 'Get Stacked — Multi-Stack Builder'}
               </h2>
-              <p className="text-[11px] text-slate-400 truncate">
+              <p className="text-[11px] text-slate-200 truncate">
                 Morning, Afternoon &amp; Evening Stacks • Auto-Verified Nutrients
               </p>
             </div>
@@ -300,7 +301,7 @@ export default function StackManager({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition shrink-0"
+              className="p-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white transition shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
@@ -308,6 +309,8 @@ export default function StackManager({
         </div>
 
         <div className="relative z-10 p-4 overflow-y-auto space-y-4">
+          {/* Persistent Daily Recommended vs. Logged Intake Chart */}
+          <PersistentAllowanceChart />
           {saveSuccessBanner && (
             <div className="rounded-xl bg-emerald-500/20 border border-emerald-400/40 p-2.5 flex items-center gap-2 text-emerald-200 text-xs font-bold">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />

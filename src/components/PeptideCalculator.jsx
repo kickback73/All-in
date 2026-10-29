@@ -15,18 +15,19 @@ import {
   Activity,
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import PersistentAllowanceChart from './PersistentAllowanceChart';
 
 export const GRANULAR_INJECTION_SITES = [
-  'Lower Left Abdomen',
-  'Lower Right Abdomen',
-  'Upper Left Abdomen',
-  'Upper Right Abdomen',
-  'Left Vastus Lateralis (Outer Thigh)',
-  'Right Vastus Lateralis (Outer Thigh)',
-  'Left Deltoid',
-  'Right Deltoid',
-  'Left Gluteal / Flank',
-  'Right Gluteal / Flank',
+  'Belly button area - lower left',
+  'Belly button area - lower right',
+  'Belly button area - upper left',
+  'Belly button area - upper right',
+  'Outer thigh - left',
+  'Outer thigh - right',
+  'Shoulder - left',
+  'Shoulder - right',
+  'Love handle - left',
+  'Love handle - right',
 ];
 
 export const SYRINGE_CAPACITIES = [
@@ -474,6 +475,9 @@ export default function PeptideCalculator({ isOpen = true }) {
 
   return (
     <div className="space-y-3.5 text-white">
+      {/* Persistent Daily Recommended vs. Logged Intake Chart */}
+      <PersistentAllowanceChart />
+
       {/* Dan's Active Protocol + NHL Remission Guardrail Banner */}
       <div className="rounded-2xl bg-emerald-500/15 border border-emerald-400/30 p-3 flex items-start gap-2.5">
         <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
@@ -639,16 +643,16 @@ export default function PeptideCalculator({ isOpen = true }) {
           </div>
         </div>
 
-        {/* Granular Anatomical Injection Site Dropdown + Exact Date & Time */}
+        {/* Simplified User-Friendly Injection Site Dropdown + Exact Date & Time */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
-            <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
-              Granular Subcutaneous Injection Site
+            <label className="block text-[10px] font-extrabold text-slate-200 uppercase mb-1">
+              Injection Site
             </label>
             <select
               value={injectionSite}
               onChange={(e) => setInjectionSite(e.target.value)}
-              className="w-full rounded-xl border border-white/15 bg-slate-950 px-2.5 py-1.5 text-xs font-bold text-white"
+              className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2.5 py-1.5 text-xs font-bold text-white"
             >
               {GRANULAR_INJECTION_SITES.map((site) => (
                 <option key={site} value={site} className="bg-slate-950 text-white">

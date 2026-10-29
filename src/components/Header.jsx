@@ -231,18 +231,16 @@ export default function Header({ onOpenProfile }) {
                   <button
                     type="button"
                     onClick={() => toggleHydrationUnit('ml')}
-                    className={`px-1.5 py-0.5 ${
-                      hydrationUnit === 'ml' ? 'bg-sky-500 text-slate-950' : 'text-slate-400'
-                    }`}
+                    className={`px-1.5 py-0.5 ${hydrationUnit === 'ml' ? 'bg-sky-500 text-slate-950' : 'text-slate-400'
+                      }`}
                   >
                     ml
                   </button>
                   <button
                     type="button"
                     onClick={() => toggleHydrationUnit('oz')}
-                    className={`px-1.5 py-0.5 ${
-                      hydrationUnit === 'oz' ? 'bg-sky-500 text-slate-950' : 'text-slate-400'
-                    }`}
+                    className={`px-1.5 py-0.5 ${hydrationUnit === 'oz' ? 'bg-sky-500 text-slate-950' : 'text-slate-400'
+                      }`}
                   >
                     oz
                   </button>
@@ -283,8 +281,8 @@ export default function Header({ onOpenProfile }) {
                   mtorState.mode === 'Autophagy / AMPK'
                     ? 'text-cyan-300'
                     : mtorState.mode === 'Balanced'
-                    ? 'text-emerald-300'
-                    : 'text-amber-300'
+                      ? 'text-emerald-300'
+                      : 'text-amber-300'
                 }
               >
                 {mtorState.mode}
