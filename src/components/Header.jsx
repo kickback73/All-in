@@ -9,8 +9,8 @@ export default function Header({ onOpenProfile }) {
     dailyHydration,
     setDailyHydration,
     dailyNutrition,
+    dailyActivity,
     mtorState,
-    setMtorState,
     syncStatusBadge,
     executePersistentSync,
   } = useAppContext();
@@ -74,23 +74,11 @@ export default function Header({ onOpenProfile }) {
     setIsEditingHydration(false);
   };
 
-  // Compute mTOR linear spectrum position (0 - 100%)
-  const leucineG = Number(mtorState.leucineTriggerGrams || ((dailyNutrition.aminos?.leucine || 0) / 1000)).toFixed(1);
-  const fastingHrs = Number(mtorState.fastingHours) || 14;
-  let mtorScore = 50;
-  if (mtorState.mode === 'Autophagy / AMPK') {
-    mtorScore = Math.max(8, Math.min(30, 32 - (fastingHrs - 12) * 3));
-  } else if (mtorState.mode === 'Balanced') {
-    mtorScore = 50;
-  } else {
-    mtorScore = Math.min(94, 72 + Math.min(22, Number(leucineG) * 5));
-  }
-
-  const cycleMtorZone = () => {
-    const order = ['Autophagy / AMPK', 'Balanced', 'Anabolic / mTORC1'];
-    const nextIdx = (order.indexOf(mtorState.mode) + 1) % order.length;
-    setMtorState((prev) => ({ ...prev, mode: order[nextIdx] }));
-  };
+  // Automated Read-Only mTOR linear spectrum position (0 - 100%) derived strictly from daily charting
+  const leucineG = Number(mtorState.leucineTriggerGrams ?? ((dailyNutrition.aminos?.leucine || 0) / 1000)).toFixed(1);
+  const fastingHrs = Number(mtorState.fastingHours ?? 16);
+  const mtorScore = Math.max(8, Math.min(96, Number(mtorState.score) || 20));
+  const workoutsCount = (dailyActivity.trainingLogs || []).length;
 
   return (
     <header className="sticky top-0 z-30 backdrop-blur-xl bg-slate-950/90 border-b border-white/10 px-3 py-2">
@@ -266,16 +254,15 @@ export default function Header({ onOpenProfile }) {
           )}
         </div>
 
-        {/* Row 3: Compact mTOR Linear Indicator Spectrum */}
+        {/* Row 3: Automated Read-Only mTOR Linear Indicator Spectrum (No manual dragging/clicking) */}
         <div
-          onClick={cycleMtorZone}
-          title="Tap to toggle mTOR zone (Auto-calculates from fasting hours, protein/leucine & training)"
-          className="bg-slate-900/90 border border-white/10 rounded-xl px-2.5 py-1.5 cursor-pointer hover:border-white/20 transition"
+          aria-readonly="true"
+          className="bg-slate-900/90 border border-white/10 rounded-xl px-2.5 py-1.5 select-none pointer-events-none"
         >
           <div className="flex items-center justify-between text-[9px] mb-1">
             <span className="font-black uppercase tracking-wider text-slate-300 flex items-center gap-1">
               <Flame className="w-3 h-3 text-amber-400" />
-              mTOR Spectrum:
+              mTOR Auto:
               <strong
                 className={
                   mtorState.mode === 'Autophagy / AMPK'
@@ -285,11 +272,11 @@ export default function Header({ onOpenProfile }) {
                       : 'text-amber-300'
                 }
               >
-                {mtorState.mode}
+                {mtorState.mode} ({mtorScore}%)
               </strong>
             </span>
             <span className="text-slate-400 font-mono">
-              Fast {fastingHrs}h • Leu {leucineG}g • PRO {dailyNutrition.protein}g
+              Fast {fastingHrs}h • Leu {leucineG}g • PRO {dailyNutrition.protein}g • Wkt {workoutsCount}
             </span>
           </div>
 
@@ -297,7 +284,7 @@ export default function Header({ onOpenProfile }) {
             <div className="absolute inset-y-0 left-1/3 w-px bg-slate-950/70" />
             <div className="absolute inset-y-0 left-2/3 w-px bg-slate-950/70" />
             <div
-              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-white border-2 border-slate-950 shadow-md transition-all duration-300"
+              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-white border-2 border-slate-950 shadow-md transition-all duration-500"
               style={{ left: `${mtorScore}%` }}
             />
           </div>

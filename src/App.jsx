@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Utensils,
   Layers,
@@ -141,16 +141,18 @@ const NutritionDetailModal = ({ onClose }) => {
   const [loadingLookup, setLoadingLookup] = useState(false);
   const [stagedFood, setStagedFood] = useState(null);
   const [lastVerifiedSource, setLastVerifiedSource] = useState('');
+  const foodInputRef = useRef(null);
 
   const handleLookupFood = async (e) => {
     if (e) e.preventDefault();
-    if (!foodQuery.trim()) return;
+    const trimmedQuery = foodQuery.trim();
+    if (!trimmedQuery) return;
     setLoadingLookup(true);
-    const verified = await lookupVerifiedNutrients(foodQuery, servingText || null);
+    const verified = await lookupVerifiedNutrients(trimmedQuery, servingText || null);
     setLoadingLookup(false);
     if (verified) {
       setStagedFood({
-        name: foodQuery.trim(),
+        name: trimmedQuery,
         servingGrams: verified.servingGrams,
         servingInputText: verified.servingInputText || `${verified.servingGrams}g`,
         calories: verified.calories,
@@ -172,9 +174,15 @@ const NutritionDetailModal = ({ onClose }) => {
       stagedFood,
       `${stagedFood.name} (${stagedFood.servingInputText || `${stagedFood.servingGrams}g`})`
     );
+    // Auto-clear ingredient and serving input fields so they are blank and ready for the next entry
     setFoodQuery('');
     setServingText('');
     setStagedFood(null);
+    setLastVerifiedSource('');
+    if (foodInputRef.current) {
+      foodInputRef.current.value = '';
+      foodInputRef.current.focus();
+    }
   };
 
   const handleRemoveMealFromDaily = (mealId) => {
@@ -187,6 +195,27 @@ const NutritionDetailModal = ({ onClose }) => {
       const nextFiber = Math.max(0, Math.round(((prev.fiber || 0) - (Number(target.fiber) || 0)) * 10) / 10);
       const nextNetCarbs = Math.max(0, Math.round((nextCarbs - nextFiber) * 10) / 10);
       const nextFats = Math.max(0, Math.round((prev.fats - (Number(target.fats) || 0)) * 10) / 10);
+
+      const nextMicros = { ...(prev.micros || {}) };
+      if (target.micros) {
+        Object.keys(target.micros).forEach((k) => {
+          nextMicros[k] = Math.max(
+            0,
+            Math.round(((Number(prev.micros?.[k]) || 0) - (Number(target.micros[k]) || 0)) * 10) / 10
+          );
+        });
+      }
+
+      const nextAminos = { ...(prev.aminos || {}) };
+      if (target.aminos) {
+        Object.keys(target.aminos).forEach((k) => {
+          nextAminos[k] = Math.max(
+            0,
+            Math.round((Number(prev.aminos?.[k]) || 0) - (Number(target.aminos[k]) || 0))
+          );
+        });
+      }
+
       return {
         ...prev,
         calories: nextCalories,
@@ -195,6 +224,8 @@ const NutritionDetailModal = ({ onClose }) => {
         fiber: nextFiber,
         netCarbs: nextNetCarbs,
         fats: nextFats,
+        micros: nextMicros,
+        aminos: nextAminos,
         meals: (prev.meals || []).filter((m) => m.id !== mealId),
       };
     });
@@ -259,6 +290,7 @@ const NutritionDetailModal = ({ onClose }) => {
               className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 w-full"
             >
               <input
+                ref={foodInputRef}
                 type="text"
                 value={foodQuery}
                 onChange={(e) => setFoodQuery(e.target.value)}

@@ -17,6 +17,7 @@ import {
   Sliders,
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { MICRONUTRIENT_FIELDS } from '../data/initialData';
 import { TILE_BACKGROUNDS } from '../utils/backgroundEngine';
 import {
   requestDeviceNotificationPermission,
@@ -584,27 +585,21 @@ export default function UserProfileModal({ isOpen, onClose }) {
                 </div>
               </div>
 
-              {/* Micronutrient Daily Targets */}
+              {/* Expanded 15-Micronutrient Daily Targets (Drives Spider / Radar Chart) */}
               <div className="rounded-2xl bg-slate-950/65 backdrop-blur-md border border-white/20 p-3 space-y-2">
                 <div className="text-[10px] font-black uppercase tracking-wider text-amber-300">
-                  Daily Micronutrient Targets
+                  Daily Micronutrient Targets (15 Vitamins &amp; Minerals)
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { key: 'vitaminD', label: 'Vit D3 (mcg)', def: 50 },
-                    { key: 'vitaminC', label: 'Vit C (mg)', def: 120 },
-                    { key: 'magnesium', label: 'Magnesium (mg)', def: 420 },
-                    { key: 'zinc', label: 'Zinc (mg)', def: 15 },
-                    { key: 'potassium', label: 'Potassium (mg)', def: 3400 },
-                    { key: 'sodium', label: 'Sodium (mg)', def: 2300 },
-                  ].map((m) => (
+                  {MICRONUTRIENT_FIELDS.map((m) => (
                     <div key={m.key}>
-                      <label className="block text-[9px] font-bold text-slate-300 mb-0.5">
-                        {m.label}
+                      <label className="block text-[9px] font-bold text-slate-300 mb-0.5 truncate">
+                        {m.shortLabel || m.label} ({m.unit})
                       </label>
                       <input
                         type="number"
-                        value={microTargets[m.key] ?? m.def}
+                        step="0.1"
+                        value={microTargets[m.key] ?? m.defaultTarget}
                         onChange={(e) => updateMicroTarget(m.key, e.target.value)}
                         className="w-full rounded-xl border border-white/20 bg-slate-950/80 px-2 py-1 text-xs font-bold text-white"
                       />

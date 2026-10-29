@@ -55,12 +55,21 @@ export const ESSENTIAL_AMINO_ACIDS = [
 ];
 
 export const MICRONUTRIENT_FIELDS = [
-  { key: 'vitaminD', label: 'Vitamin D3', unit: 'mcg' },
-  { key: 'vitaminC', label: 'Vitamin C', unit: 'mg' },
-  { key: 'magnesium', label: 'Magnesium', unit: 'mg' },
-  { key: 'zinc', label: 'Zinc', unit: 'mg' },
-  { key: 'potassium', label: 'Potassium', unit: 'mg' },
-  { key: 'sodium', label: 'Sodium', unit: 'mg' },
+  { key: 'vitaminA', label: 'Vitamin A', shortLabel: 'Vit A', unit: 'mcg', defaultTarget: 900, category: 'Vitamin' },
+  { key: 'vitaminC', label: 'Vitamin C', shortLabel: 'Vit C', unit: 'mg', defaultTarget: 120, category: 'Vitamin' },
+  { key: 'vitaminD', label: 'Vitamin D3', shortLabel: 'Vit D3', unit: 'mcg', defaultTarget: 50, category: 'Vitamin' },
+  { key: 'vitaminE', label: 'Vitamin E', shortLabel: 'Vit E', unit: 'mg', defaultTarget: 15, category: 'Vitamin' },
+  { key: 'vitaminK', label: 'Vitamin K2', shortLabel: 'Vit K2', unit: 'mcg', defaultTarget: 120, category: 'Vitamin' },
+  { key: 'vitaminB6', label: 'Vitamin B6', shortLabel: 'Vit B6', unit: 'mg', defaultTarget: 1.7, category: 'Vitamin' },
+  { key: 'vitaminB12', label: 'Vitamin B12', shortLabel: 'Vit B12', unit: 'mcg', defaultTarget: 2.4, category: 'Vitamin' },
+  { key: 'folate', label: 'Folate (B9)', shortLabel: 'Folate', unit: 'mcg', defaultTarget: 400, category: 'Vitamin' },
+  { key: 'calcium', label: 'Calcium', shortLabel: 'Calcium', unit: 'mg', defaultTarget: 1000, category: 'Mineral' },
+  { key: 'iron', label: 'Iron', shortLabel: 'Iron', unit: 'mg', defaultTarget: 8, category: 'Mineral' },
+  { key: 'magnesium', label: 'Magnesium', shortLabel: 'Magnes.', unit: 'mg', defaultTarget: 420, category: 'Mineral' },
+  { key: 'zinc', label: 'Zinc', shortLabel: 'Zinc', unit: 'mg', defaultTarget: 15, category: 'Mineral' },
+  { key: 'selenium', label: 'Selenium', shortLabel: 'Selenium', unit: 'mcg', defaultTarget: 55, category: 'Mineral' },
+  { key: 'potassium', label: 'Potassium', shortLabel: 'Potass.', unit: 'mg', defaultTarget: 3400, category: 'Mineral' },
+  { key: 'sodium', label: 'Sodium', shortLabel: 'Sodium', unit: 'mg', defaultTarget: 2300, category: 'Mineral' },
 ];
 
 export function getInitialHistoricalLogs() {

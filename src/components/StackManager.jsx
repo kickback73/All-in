@@ -30,6 +30,12 @@ let ingredientSeq = 1;
 const generateUniqueIngId = () =>
   `ing_${Date.now()}_${ingredientSeq++}_${Math.random().toString(36).slice(2, 7)}`;
 
+const createEmptyMicros = () =>
+  MICRONUTRIENT_FIELDS.reduce((acc, m) => {
+    acc[m.key] = 0;
+    return acc;
+  }, {});
+
 const createEmptyIngredient = () => ({
   id: generateUniqueIngId(),
   name: '',
@@ -43,7 +49,7 @@ const createEmptyIngredient = () => ({
   netCarbs: 0,
   fats: 0,
   waterMl: 0,
-  micros: { vitaminD: 0, vitaminC: 0, magnesium: 0, zinc: 0, potassium: 0, sodium: 0 },
+  micros: createEmptyMicros(),
   aminos: {
     leucine: 0,
     isoleucine: 0,
@@ -91,7 +97,7 @@ export function calculateStackTotals(ingredients = []) {
       netCarbs: 0,
       fats: 0,
       waterMl: 0,
-      micros: { vitaminD: 0, vitaminC: 0, magnesium: 0, zinc: 0, potassium: 0, sodium: 0 },
+      micros: createEmptyMicros(),
       aminos: {
         leucine: 0,
         isoleucine: 0,
@@ -558,8 +564,32 @@ export default function StackManager({
                   </div>
 
                   {ing.source && (
-                    <div className="text-[10px] font-bold text-emerald-300 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-md truncate">
-                      ✓ {ing.source}
+                    <div className="flex items-center justify-between gap-2 bg-emerald-950/60 border border-emerald-500/30 px-2 py-1 rounded-lg">
+                      <span className="text-[10px] font-bold text-emerald-300 truncate">
+                        ✓ {ing.source}
+                      </span>
+                      {onLogStack && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onLogStack({
+                              name: `${ing.name} (${ing.servingGrams})`,
+                              totals: ing,
+                            });
+                            setIngredients((prev) =>
+                              prev.map((item) =>
+                                item.id === ing.id
+                                  ? { ...createEmptyIngredient(), id: ing.id }
+                                  : item
+                              )
+                            );
+                          }}
+                          className="px-2 py-0.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[9px] font-black shrink-0 flex items-center gap-0.5"
+                        >
+                          <Plus className="w-2.5 h-2.5" />
+                          <span>Add to Daily Totals</span>
+                        </button>
+                      )}
                     </div>
                   )}
 

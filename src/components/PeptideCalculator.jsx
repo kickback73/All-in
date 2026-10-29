@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import PersistentAllowanceChart from './PersistentAllowanceChart';
+import { resolvePeptideAminoSynergy, lookupVerifiedNutrients } from '../utils/nutrientEngine';
 
 export const GRANULAR_INJECTION_SITES = [
   'Belly button area - lower left',
@@ -255,15 +256,20 @@ function resolveClinicalMonograph(queryText = '') {
 export default function PeptideCalculator({ isOpen = true }) {
   const {
     peptideHistory,
+    activePeptideName,
+    setActivePeptideName,
     addPeptideEntry,
     updatePeptideEntry,
     deletePeptideEntry,
     savedStacks,
     setSavedStacks,
+    logStackToDaily,
   } = useAppContext();
 
   // Reconstitution & Logging Form State
-  const [peptideName, setPeptideName] = useState('Retatrutide (GLP-1/GIP/GCGR)');
+  const [peptideName, setPeptideName] = useState(
+    activePeptideName || 'Retatrutide (GLP-1/GIP/GCGR)'
+  );
   const [vialMg, setVialMg] = useState(10);
   const [bacWaterMl, setBacWaterMl] = useState(2);
   const [desiredDoseValue, setDesiredDoseValue] = useState(3);
@@ -328,17 +334,31 @@ export default function PeptideCalculator({ isOpen = true }) {
 
   const activeSafetyAlert = useMemo(() => evaluatePeptideSafety(peptideName), [peptideName]);
   const querySafetyAlert = useMemo(() => evaluatePeptideSafety(queryName), [queryName]);
+  const activePeptideSynergy = useMemo(
+    () => resolvePeptideAminoSynergy(peptideName),
+    [peptideName]
+  );
 
   if (!isOpen) return null;
 
   const handleSelectPreset = (presetName) => {
     setPeptideName(presetName);
+    setActivePeptideName(presetName);
     const found = CLEARED_PEPTIDE_PRESETS.find((p) => p.name === presetName);
     if (found) {
       setVialMg(found.defaultVialMg);
       setBacWaterMl(found.defaultBacMl);
       setDesiredDoseValue(found.defaultDose);
       setDesiredDoseUnit(found.defaultUnit);
+    }
+  };
+
+  const handleQuickLogSynergyFood = async (foodRec) => {
+    const verified = await lookupVerifiedNutrients(foodRec.query, foodRec.serving);
+    if (verified) {
+      logStackToDaily(verified, foodRec.name);
+      setAddedToStackBanner(`Logged synergistic food "${foodRec.name}" to Daily Totals!`);
+      setTimeout(() => setAddedToStackBanner(''), 2500);
     }
   };
 
@@ -556,7 +576,13 @@ export default function PeptideCalculator({ isOpen = true }) {
             type="text"
             required
             value={peptideName}
-            onChange={(e) => setPeptideName(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setPeptideName(val);
+              if (!evaluatePeptideSafety(val)?.isProhibited && val.trim()) {
+                setActivePeptideName(val);
+              }
+            }}
             placeholder="Type peptide name (e.g. Retatrutide, Matrixyl 3000)..."
             className="w-full rounded-xl border border-white/15 bg-slate-950 px-3 py-1.5 text-xs font-bold text-white"
           />
@@ -732,6 +758,70 @@ export default function PeptideCalculator({ isOpen = true }) {
           )}
         </div>
       </form>
+
+      {/* Targeted Amino Acid Prioritization & Synergistic Food Recommendations for Active Peptide */}
+      {!activeSafetyAlert?.isProhibited && activePeptideSynergy && (
+        <div className="rounded-2xl border border-cyan-400/40 p-3.5 space-y-2.5 bg-slate-900/90">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-cyan-300">
+              ★ Peptide-Driven Amino Prioritization &amp; Food Sources
+            </span>
+            <span className="text-[9px] font-bold text-emerald-300">
+              {activePeptideSynergy.peptideLabel.split(' (')[0]}
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-300 leading-snug">
+            {activePeptideSynergy.protocolObjective}
+          </p>
+
+          <div className="space-y-1.5">
+            {Object.entries(activePeptideSynergy.prioritizedAminos).map(([key, info]) => (
+              <div
+                key={key}
+                className="rounded-xl bg-slate-950/90 border border-cyan-500/30 p-2 space-y-0.5"
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] font-black uppercase text-white">
+                    {key}
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-amber-400 text-slate-950">
+                    {info.badge}
+                  </span>
+                </div>
+                <p className="text-[9px] text-slate-300 leading-snug">{info.synergyReason}</p>
+                <div className="text-[9px] font-bold text-emerald-300">
+                  Top Foods: {info.foods}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-1.5 pt-1">
+            <div className="text-[9px] font-black uppercase tracking-wider text-emerald-300">
+              Direct Food Recommendations (Tap to Log to Daily Nutrition)
+            </div>
+            {(activePeptideSynergy.recommendedFoods || []).map((food) => (
+              <div
+                key={food.name}
+                className="rounded-xl bg-slate-950/90 border border-white/15 px-2.5 py-1.5 flex items-center justify-between gap-2"
+              >
+                <div className="min-w-0">
+                  <div className="text-[10px] font-black text-white truncate">{food.name}</div>
+                  <div className="text-[9px] font-bold text-cyan-300 truncate">{food.highlight}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleQuickLogSynergyFood(food)}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[9px] font-black shrink-0 flex items-center gap-0.5"
+                >
+                  <Plus className="w-2.5 h-2.5" />
+                  <span>Log Food</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* NHL Remission Clinical Search & Monograph Verifier (Populated Summary Panel + Start/Add to Custom Stack) */}
       <div className="rounded-2xl border border-white/15 p-3.5 space-y-2.5 bg-slate-900/90">

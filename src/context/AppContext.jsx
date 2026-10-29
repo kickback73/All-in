@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { VISUAL_ASSET_LIBRARY } from '../utils/backgroundEngine';
 import { DANS_MORNING_STACK } from '../utils/nutrientEngine';
+import { MICRONUTRIENT_FIELDS, ESSENTIAL_AMINO_ACIDS } from '../data/initialData';
 import {
   registerAllInServiceWorker,
   triggerDeviceNotification,
@@ -30,10 +31,8 @@ function buildInitialCalendarSchedule() {
       if (offset === 0 || offset === -1 || offset === -3 || offset === -5) {
         completed[key] = true;
       }
-      // Leave offset -2 or -4 scheduled without completion so "Missed" red state is clearly visible
     }
   }
-  // Ensure at least one past day is scheduled & missed (red) and today is scheduled & completed (green)
   const twoDaysAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 2);
   const twoDaysAgoKey = toIsoDateKey(twoDaysAgo);
   scheduled[twoDaysAgoKey] = true;
@@ -45,6 +44,16 @@ function buildInitialCalendarSchedule() {
 
   return { scheduled, completed };
 }
+
+const DEFAULT_MICROS_LOGGED = MICRONUTRIENT_FIELDS.reduce((acc, m) => {
+  acc[m.key] = 0;
+  return acc;
+}, {});
+
+const DEFAULT_MICROS_TARGETS = MICRONUTRIENT_FIELDS.reduce((acc, m) => {
+  acc[m.key] = m.defaultTarget;
+  return acc;
+}, {});
 
 const INITIAL_NUTRITION = {
   calories: 0,
@@ -59,14 +68,7 @@ const INITIAL_NUTRITION = {
   fats: 0,
   targetFats: 65,
   meals: [],
-  micros: {
-    vitaminD: 0,
-    vitaminC: 0,
-    magnesium: 0,
-    zinc: 0,
-    potassium: 0,
-    sodium: 0,
-  },
+  micros: { ...DEFAULT_MICROS_LOGGED },
   aminos: {
     leucine: 0,
     isoleucine: 0,
@@ -79,14 +81,7 @@ const INITIAL_NUTRITION = {
     histidine: 0,
   },
   targets: {
-    micros: {
-      vitaminD: 50,
-      vitaminC: 120,
-      magnesium: 420,
-      zinc: 15,
-      potassium: 3400,
-      sodium: 2300,
-    },
+    micros: { ...DEFAULT_MICROS_TARGETS },
     aminos: {
       leucine: 3000,
       isoleucine: 1500,
@@ -169,6 +164,95 @@ const INITIAL_PEPTIDE_HISTORY = [
   },
 ];
 
+/**
+ * Automated, Read-Only mTOR Spectrum Computation Engine
+ * Strictly derives mTORC1 vs. AMPK/Autophagy signaling from daily charting:
+ * 1) Fasting window & meal timing (`meals`)
+ * 2) Protein & Leucine threshold (`protein`, `aminos.leucine`)
+ * 3) Logged workouts (`trainingLogs` resistance tension vs. fasted cardio)
+ */
+function computeAutomatedMtorState(dailyNutrition, dailyActivity) {
+  const proteinG = Number(dailyNutrition.protein) || 0;
+  const targetProteinG = Math.max(100, Number(dailyNutrition.targetProtein) || 180);
+  const leucineG = Number(((Number(dailyNutrition.aminos?.leucine) || 0) / 1000).toFixed(2));
+  const calories = Number(dailyNutrition.calories) || 0;
+  const meals = Array.isArray(dailyNutrition.meals) ? dailyNutrition.meals : [];
+  const trainingLogs = Array.isArray(dailyActivity.trainingLogs) ? dailyActivity.trainingLogs : [];
+
+  // Determine caloric meals (> 15 kcal) to compute fasting hours
+  const caloricMeals = meals.filter((m) => (Number(m.calories) || 0) > 15 || (Number(m.protein) || 0) > 3);
+  let fastingHours = 16;
+
+  if (caloricMeals.length === 0 && calories <= 15 && proteinG <= 3) {
+    // Fasted state: derive hours since 20:00 prior evening (typical 14-18h window)
+    const nowHour = new Date().getHours();
+    fastingHours = Math.max(12, Math.min(20, nowHour + 4));
+  } else {
+    // Fed state: calculate elapsed hours since most recent meal (or feeding state)
+    const latestMeal = caloricMeals[0];
+    if (latestMeal?.loggedAtMs) {
+      const elapsedHrs = Math.max(0, (Date.now() - Number(latestMeal.loggedAtMs)) / 3600000);
+      fastingHours = Number(elapsedHrs.toFixed(1));
+    } else {
+      fastingHours = 0.5;
+    }
+  }
+
+  // Workout signaling: Resistance bands / weights / core vs. Spin cardio
+  const hasResistanceWorkout = trainingLogs.some((t) =>
+    /band|weight|ab wheel|squat|press|row|curl|pull|push|core|calisthenic/i.test(t.type || '')
+  );
+  const hasCardioWorkout = trainingLogs.some((t) => /spin|bike|cardio|zone/i.test(t.type || ''));
+
+  // Continuous mTOR Score (8 to 96)
+  // Base fasted score starts low in Autophagy/AMPK (18), rises with Leucine, Protein, and Resistance mechanical tension
+  let rawScore = 20;
+
+  // Fasting suppression (longer fast > 12h drives AMPK deeper toward 10-25%)
+  if (fastingHours >= 12) {
+    rawScore -= Math.min(12, (fastingHours - 12) * 2);
+  } else {
+    // Recently fed window
+    rawScore += Math.max(0, 14 - fastingHours * 2);
+  }
+
+  // Leucine ribosomal mTORC1 trigger (2.5g - 3.0g threshold is primary driver)
+  rawScore += Math.min(38, leucineG * 13.5);
+
+  // Total daily protein contribution
+  rawScore += Math.min(24, (proteinG / targetProteinG) * 24);
+
+  // Workout modulation
+  if (hasResistanceWorkout && (proteinG >= 15 || leucineG >= 0.8)) {
+    // Post-resistance + amino availability amplifies mTORC1 muscle protein synthesis
+    rawScore += 12;
+  } else if (hasResistanceWorkout) {
+    rawScore += 5;
+  }
+
+  if (hasCardioWorkout && proteinG < 15 && calories < 100) {
+    // Fasted Zone 2 Spin Bike deepens AMPK / Autophagy
+    rawScore -= 6;
+  }
+
+  const mtorScore = Math.max(8, Math.min(96, Math.round(rawScore)));
+
+  let mode = 'Balanced';
+  if (mtorScore < 34) {
+    mode = 'Autophagy / AMPK';
+  } else if (mtorScore > 66) {
+    mode = 'Anabolic / mTORC1';
+  }
+
+  return {
+    mode,
+    score: mtorScore,
+    fastingHours,
+    postWorkoutWindow: hasResistanceWorkout,
+    leucineTriggerGrams: leucineG,
+  };
+}
+
 export const AppProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(() => {
     const saved = localStorage.getItem('allIn_userProfile_v6');
@@ -199,6 +283,14 @@ export const AppProvider = ({ children }) => {
       return {
         ...INITIAL_NUTRITION,
         ...parsed,
+        micros: {
+          ...INITIAL_NUTRITION.micros,
+          ...(parsed?.micros || {}),
+        },
+        aminos: {
+          ...INITIAL_NUTRITION.aminos,
+          ...(parsed?.aminos || {}),
+        },
         targets: {
           micros: {
             ...INITIAL_NUTRITION.targets.micros,
@@ -247,22 +339,19 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : INITIAL_PEPTIDE_HISTORY;
   });
 
+  const [activePeptideName, setActivePeptideName] = useState(() => {
+    const saved = localStorage.getItem('allIn_activePeptideName_v6');
+    return saved || 'Retatrutide (GLP-1/GIP/GCGR)';
+  });
+
   const [historicalLogs, setHistoricalLogs] = useState(() => {
     const saved = localStorage.getItem('allIn_historicalLogs_v6');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [mtorState, setMtorState] = useState(() => {
-    const saved = localStorage.getItem('allIn_mtorState_v6');
-    return saved
-      ? JSON.parse(saved)
-      : {
-          mode: 'Autophagy / AMPK',
-          fastingHours: 14,
-          postWorkoutWindow: false,
-          leucineTriggerGrams: 0,
-        };
-  });
+  const [mtorState, setMtorState] = useState(() =>
+    computeAutomatedMtorState(INITIAL_NUTRITION, INITIAL_ACTIVITY)
+  );
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [syncStatusBadge, setSyncStatusBadge] = useState('Syncing...');
@@ -291,7 +380,14 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     localStorage.setItem('allIn_peptideHistory_v6', JSON.stringify(peptideHistory));
+    if (peptideHistory[0]?.peptideName) {
+      setActivePeptideName(peptideHistory[0].peptideName);
+    }
   }, [peptideHistory]);
+
+  useEffect(() => {
+    localStorage.setItem('allIn_activePeptideName_v6', activePeptideName);
+  }, [activePeptideName]);
 
   useEffect(() => {
     localStorage.setItem('allIn_historicalLogs_v6', JSON.stringify(historicalLogs));
@@ -306,25 +402,19 @@ export const AppProvider = ({ children }) => {
     registerAllInServiceWorker();
   }, []);
 
-  // Update mTOR state automatically when protein/leucine changes
+  // Automatically recalculate read-only mTOR state strictly from daily charting (fasting, protein/leucine, workouts)
   useEffect(() => {
-    const leucineGrams = Number(((dailyNutrition.aminos?.leucine || 0) / 1000).toFixed(2));
-    setMtorState((prev) => {
-      let nextMode = prev.mode;
-      if (leucineGrams >= 2.5 || dailyNutrition.protein >= 90) {
-        nextMode = 'Anabolic / mTORC1';
-      } else if (leucineGrams >= 1.0 || dailyNutrition.protein >= 30) {
-        nextMode = 'Balanced';
-      } else {
-        nextMode = 'Autophagy / AMPK';
-      }
-      return {
-        ...prev,
-        mode: nextMode,
-        leucineTriggerGrams: leucineGrams,
-      };
-    });
-  }, [dailyNutrition.protein, dailyNutrition.aminos?.leucine]);
+    const nextMtor = computeAutomatedMtorState(dailyNutrition, dailyActivity);
+    setMtorState(nextMtor);
+  }, [
+    dailyNutrition.calories,
+    dailyNutrition.protein,
+    dailyNutrition.aminos?.leucine,
+    dailyNutrition.meals,
+    dailyNutrition.targetProtein,
+    dailyActivity.trainingLogs,
+    dailyActivity.caloriesBurned,
+  ]);
 
   const executePersistentSync = useCallback(
     (reason = 'launch') => {
@@ -424,10 +514,23 @@ export const AppProvider = ({ children }) => {
       const nextFiber = Math.round(((prev.fiber || 0) + addedFiber) * 10) / 10;
       const nextNetCarbs = Math.max(0, Math.round((nextCarbs - nextFiber) * 10) / 10);
 
+      const nextMicros = { ...(prev.micros || {}) };
+      MICRONUTRIENT_FIELDS.forEach(({ key }) => {
+        nextMicros[key] =
+          Math.round(((Number(prev.micros?.[key]) || 0) + (Number(stackTotals.micros?.[key]) || 0)) * 10) / 10;
+      });
+
+      const nextAminos = { ...(prev.aminos || {}) };
+      ESSENTIAL_AMINO_ACIDS.forEach(({ key }) => {
+        nextAminos[key] = Math.round(
+          (Number(prev.aminos?.[key]) || 0) + (Number(stackTotals.aminos?.[key]) || 0)
+        );
+      });
+
       const newMeal = itemName
         ? [
             {
-              id: `meal_${Date.now()}`,
+              id: `meal_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
               name: itemName,
               calories: Math.round(Number(stackTotals.calories) || 0),
               protein: Math.round((Number(stackTotals.protein) || 0) * 10) / 10,
@@ -435,6 +538,9 @@ export const AppProvider = ({ children }) => {
               fiber: addedFiber,
               netCarbs: addedNetCarbs,
               fats: Math.round((Number(stackTotals.fats ?? stackTotals.fat) || 0) * 10) / 10,
+              micros: stackTotals.micros || {},
+              aminos: stackTotals.aminos || {},
+              loggedAtMs: Date.now(),
               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             },
             ...(prev.meals || []),
@@ -450,25 +556,8 @@ export const AppProvider = ({ children }) => {
         netCarbs: nextNetCarbs,
         fats: Math.round((prev.fats + (Number(stackTotals.fats ?? stackTotals.fat) || 0)) * 10) / 10,
         meals: newMeal,
-        micros: {
-          vitaminD: Math.round(((prev.micros?.vitaminD || 0) + (Number(stackTotals.micros?.vitaminD) || 0)) * 10) / 10,
-          vitaminC: Math.round((prev.micros?.vitaminC || 0) + (Number(stackTotals.micros?.vitaminC) || 0)),
-          magnesium: Math.round((prev.micros?.magnesium || 0) + (Number(stackTotals.micros?.magnesium) || 0)),
-          zinc: Math.round(((prev.micros?.zinc || 0) + (Number(stackTotals.micros?.zinc) || 0)) * 10) / 10,
-          potassium: Math.round((prev.micros?.potassium || 0) + (Number(stackTotals.micros?.potassium) || 0)),
-          sodium: Math.round((prev.micros?.sodium || 0) + (Number(stackTotals.micros?.sodium) || 0)),
-        },
-        aminos: {
-          leucine: Math.round((prev.aminos?.leucine || 0) + (Number(stackTotals.aminos?.leucine) || 0)),
-          isoleucine: Math.round((prev.aminos?.isoleucine || 0) + (Number(stackTotals.aminos?.isoleucine) || 0)),
-          valine: Math.round((prev.aminos?.valine || 0) + (Number(stackTotals.aminos?.valine) || 0)),
-          lysine: Math.round((prev.aminos?.lysine || 0) + (Number(stackTotals.aminos?.lysine) || 0)),
-          methionine: Math.round((prev.aminos?.methionine || 0) + (Number(stackTotals.aminos?.methionine) || 0)),
-          phenylalanine: Math.round((prev.aminos?.phenylalanine || 0) + (Number(stackTotals.aminos?.phenylalanine) || 0)),
-          threonine: Math.round((prev.aminos?.threonine || 0) + (Number(stackTotals.aminos?.threonine) || 0)),
-          tryptophan: Math.round((prev.aminos?.tryptophan || 0) + (Number(stackTotals.aminos?.tryptophan) || 0)),
-          histidine: Math.round((prev.aminos?.histidine || 0) + (Number(stackTotals.aminos?.histidine) || 0)),
-        },
+        micros: nextMicros,
+        aminos: nextAminos,
       };
     });
 
@@ -492,6 +581,9 @@ export const AppProvider = ({ children }) => {
   // Peptide CRUD handlers
   const addPeptideEntry = (entry) => {
     setPeptideHistory((prev) => [entry, ...prev]);
+    if (entry.peptideName) {
+      setActivePeptideName(entry.peptideName);
+    }
     if (userProfile.notificationsEnabled) {
       triggerDeviceNotification(
         'All In — Dose Logged',
@@ -549,7 +641,6 @@ export const AppProvider = ({ children }) => {
       const nextScheduled = { ...(prev.scheduledDates || {}) };
       const nextCompleted = { ...(prev.completedDates || {}) };
 
-      // Cycle: Unscheduled -> Scheduled -> Scheduled + Completed -> Unscheduled
       if (!isSched && !isComp) {
         nextScheduled[dateKey] = true;
       } else if (isSched && !isComp) {
@@ -633,6 +724,8 @@ export const AppProvider = ({ children }) => {
         setSavedStacks,
         peptideHistory,
         setPeptideHistory,
+        activePeptideName,
+        setActivePeptideName,
         addPeptideEntry,
         updatePeptideEntry,
         deletePeptideEntry,
@@ -642,7 +735,6 @@ export const AppProvider = ({ children }) => {
         historicalLogs,
         setHistoricalLogs,
         mtorState,
-        setMtorState,
         logStackToDaily,
         archiveDailyLog,
         isScannerOpen,
