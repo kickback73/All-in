@@ -11,10 +11,8 @@ import {
   CheckCircle2,
   Camera,
   HeartPulse,
-  Flame,
   Trash2,
-  Bike,
-  Activity,
+  BarChart3,
 } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import Header from './components/Header';
@@ -23,13 +21,10 @@ import PeptideCalculator from './components/PeptideCalculator';
 import UserProfileModal from './components/UserProfileModal';
 import BarcodeScannerModal from './components/BarcodeScannerModal';
 import { TILE_BACKGROUNDS } from './utils/backgroundEngine';
-import {
-  lookupVerifiedNutrients,
-  VERIFIED_NUTRIENT_DATABASE,
-} from './utils/nutrientEngine';
+import { lookupVerifiedNutrients } from './utils/nutrientEngine';
 
 /**
- * SVG Macro Ring / Doughnut Chart (Protein, Fats, Carbs breakdown) + Caloric & Fiber Progress
+ * SVG Macro Ring / Doughnut Chart (Protein, Fats, Carbs breakdown) + Caloric Progress
  */
 const MacroDoughnutChart = ({
   protein = 0,
@@ -68,7 +63,6 @@ const MacroDoughnutChart = ({
           stroke="rgba(255,255,255,0.14)"
           strokeWidth="5"
         />
-        {/* Protein Segment (Emerald) */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -79,7 +73,6 @@ const MacroDoughnutChart = ({
           strokeDasharray={`${protLen} ${circumference}`}
           strokeDashoffset={0}
         />
-        {/* Carbs Segment (Cyan) */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -90,7 +83,6 @@ const MacroDoughnutChart = ({
           strokeDasharray={`${carbLen} ${circumference}`}
           strokeDashoffset={-protLen}
         />
-        {/* Fats Segment (Amber) */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -130,7 +122,103 @@ const MiniSyringeChart = ({ units = 60 }) => {
 };
 
 /**
- * Tile 2 Modal: Nutrition Overhaul (Macro Ring Chart + Calorie/Fiber Progress + Enter/Lookup + UPC Scanner)
+ * Dynamic Daily Allowance Comparison Chart (Calories, Protein, Carbs, Fats, Fiber vs. Dan's Daily Maximum Allowances)
+ */
+const DailyAllowanceComparisonChart = ({ dailyNutrition }) => {
+  const metrics = [
+    {
+      label: 'Calories',
+      current: Math.round(Number(dailyNutrition.calories) || 0),
+      target: Number(dailyNutrition.targetCalories) || 1900,
+      unit: 'kcal',
+      barColor: 'from-emerald-400 to-teal-400',
+      textColor: 'text-emerald-300',
+    },
+    {
+      label: 'Protein',
+      current: Math.round((Number(dailyNutrition.protein) || 0) * 10) / 10,
+      target: Number(dailyNutrition.targetProtein) || 180,
+      unit: 'g',
+      barColor: 'from-sky-400 to-cyan-300',
+      textColor: 'text-sky-300',
+    },
+    {
+      label: 'Carbs',
+      current: Math.round((Number(dailyNutrition.carbs) || 0) * 10) / 10,
+      target: Number(dailyNutrition.targetCarbs) || 140,
+      unit: 'g',
+      barColor: 'from-cyan-400 to-blue-400',
+      textColor: 'text-cyan-300',
+    },
+    {
+      label: 'Fats',
+      current: Math.round((Number(dailyNutrition.fats) || 0) * 10) / 10,
+      target: Number(dailyNutrition.targetFats) || 65,
+      unit: 'g',
+      barColor: 'from-amber-400 to-orange-400',
+      textColor: 'text-amber-300',
+    },
+    {
+      label: 'Fiber',
+      current: Math.round((Number(dailyNutrition.fiber) || 0) * 10) / 10,
+      target: Number(dailyNutrition.targetFiber) || 32,
+      unit: 'g',
+      barColor: 'from-violet-400 to-fuchsia-400',
+      textColor: 'text-violet-300',
+    },
+  ];
+
+  return (
+    <div className="rounded-2xl bg-slate-900/90 border border-white/15 p-3.5 space-y-2.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+          <BarChart3 className="w-3.5 h-3.5" />
+          <span>Live Daily Allowance Comparison Chart</span>
+        </span>
+        <span className="text-[9px] font-bold text-slate-400">
+          Net Carbs: {dailyNutrition.netCarbs || 0}g
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        {metrics.map((m) => {
+          const pct = Math.min(100, Math.round((m.current / Math.max(1, m.target)) * 100));
+          const remaining = Math.max(0, Math.round((m.target - m.current) * 10) / 10);
+          return (
+            <div key={m.label} className="space-y-0.5">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="font-extrabold text-white">{m.label}</span>
+                <div className="flex items-center gap-2 font-mono">
+                  <span className={`font-black ${m.textColor}`}>
+                    {m.current} / {m.target} {m.unit} ({pct}%)
+                  </span>
+                  <span className="text-[9px] text-slate-400">
+                    [{remaining} {m.unit} left]
+                  </span>
+                </div>
+              </div>
+              <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-white/10">
+                <div
+                  className={`h-full bg-gradient-to-r ${m.barColor} rounded-full transition-all duration-300`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Tile 2 Modal: Nutrition Overhaul
+ * - Maintains active dark-glass theme & TILE_BACKGROUNDS.nutrition backdrop
+ * - No "verified staple" UI chip/dropdown
+ * - Flexible text serving inputs (e.g. "3/4 cup", "2 tbsp", "8 oz", "1.5 scoops")
+ * - Accurate Black Coffee (~2 kcal per 8 oz / 240ml) + dairy/sweetener modifiers
+ * - Opening Camera UPC Scanner keeps Nutrition modal open underneath
+ * - Live Dynamic Daily Allowance Comparison Chart
  */
 const NutritionDetailModal = ({ onClose }) => {
   const {
@@ -141,45 +229,22 @@ const NutritionDetailModal = ({ onClose }) => {
   } = useAppContext();
 
   const [foodQuery, setFoodQuery] = useState('');
-  const [foodGrams, setFoodGrams] = useState('');
+  const [servingText, setServingText] = useState('');
   const [loadingLookup, setLoadingLookup] = useState(false);
   const [stagedFood, setStagedFood] = useState(null);
   const [lastVerifiedSource, setLastVerifiedSource] = useState('');
 
-  // Perform verified lookup (populates staged fields immediately, never leaves fields blank)
   const handleLookupFood = async (e) => {
     if (e) e.preventDefault();
     if (!foodQuery.trim()) return;
     setLoadingLookup(true);
-    const verified = await lookupVerifiedNutrients(foodQuery, foodGrams || null);
+    const verified = await lookupVerifiedNutrients(foodQuery, servingText || null);
     setLoadingLookup(false);
     if (verified) {
       setStagedFood({
         name: foodQuery.trim(),
         servingGrams: verified.servingGrams,
-        calories: verified.calories,
-        protein: verified.protein,
-        carbs: verified.carbs,
-        fiber: verified.fiber,
-        netCarbs: verified.netCarbs,
-        fats: verified.fats,
-        micros: verified.micros,
-        aminos: verified.aminos,
-      });
-      setLastVerifiedSource(verified.source);
-    }
-  };
-
-  const handleSelectStaple = async (keyword) => {
-    if (!keyword) return;
-    setFoodQuery(keyword);
-    setLoadingLookup(true);
-    const verified = await lookupVerifiedNutrients(keyword, foodGrams || null);
-    setLoadingLookup(false);
-    if (verified) {
-      setStagedFood({
-        name: verified.source.split(' (')[0],
-        servingGrams: verified.servingGrams,
+        servingInputText: verified.servingInputText || `${verified.servingGrams}g`,
         calories: verified.calories,
         protein: verified.protein,
         carbs: verified.carbs,
@@ -195,35 +260,60 @@ const NutritionDetailModal = ({ onClose }) => {
 
   const handleCommitStagedFood = () => {
     if (!stagedFood) return;
-    logStackToDaily(stagedFood, stagedFood.name);
+    logStackToDaily(
+      stagedFood,
+      `${stagedFood.name} (${stagedFood.servingInputText || `${stagedFood.servingGrams}g`})`
+    );
     setFoodQuery('');
-    setFoodGrams('');
+    setServingText('');
     setStagedFood(null);
   };
 
-  const calPct = Math.min(
-    100,
-    Math.round((dailyNutrition.calories / Math.max(1, dailyNutrition.targetCalories)) * 100)
-  );
-  const fiberPct = Math.min(
-    100,
-    Math.round(((dailyNutrition.fiber || 0) / Math.max(1, dailyNutrition.targetFiber || 32)) * 100)
-  );
+  const handleRemoveMealFromDaily = (mealId) => {
+    setDailyNutrition((prev) => {
+      const target = (prev.meals || []).find((m) => m.id === mealId);
+      if (!target) return prev;
+      const nextCalories = Math.max(0, Math.round(prev.calories - (Number(target.calories) || 0)));
+      const nextProtein = Math.max(0, Math.round((prev.protein - (Number(target.protein) || 0)) * 10) / 10);
+      const nextCarbs = Math.max(0, Math.round((prev.carbs - (Number(target.carbs) || 0)) * 10) / 10);
+      const nextFiber = Math.max(0, Math.round(((prev.fiber || 0) - (Number(target.fiber) || 0)) * 10) / 10);
+      const nextNetCarbs = Math.max(0, Math.round((nextCarbs - nextFiber) * 10) / 10);
+      const nextFats = Math.max(0, Math.round((prev.fats - (Number(target.fats) || 0)) * 10) / 10);
+      return {
+        ...prev,
+        calories: nextCalories,
+        protein: nextProtein,
+        carbs: nextCarbs,
+        fiber: nextFiber,
+        netCarbs: nextNetCarbs,
+        fats: nextFats,
+        meals: (prev.meals || []).filter((m) => m.id !== mealId),
+      };
+    });
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-hidden flex flex-col text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-3 overflow-y-auto">
+      <div className="relative bg-slate-950 border border-white/15 rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-hidden flex flex-col text-white">
+        {/* Consistent Tile Background Image + Dark Glass Backdrop */}
+        <img
+          src={TILE_BACKGROUNDS.nutrition}
+          alt="Nutrition Backdrop"
+          className="absolute inset-0 w-full h-full object-cover object-center opacity-25 pointer-events-none"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/92 to-slate-950/95 pointer-events-none" />
+
         {/* Header */}
-        <div className="px-4 py-3.5 bg-[#F4F8FB] border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-2xl bg-emerald-600 text-white">
+        <div className="relative z-10 px-4 py-3.5 bg-slate-900/90 border-b border-white/15 flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-2 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 shrink-0">
               <Utensils className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-sm font-black text-slate-900">
-                Nutrition &amp; Verified Macro Engine
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-white truncate">
+                Nutrition &amp; Daily Allowance Engine
               </h2>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-400 truncate">
                 Target: 1,850–1,950 kcal • 170–190g Protein • Facial Fat Pad Preservation
               </p>
             </div>
@@ -231,101 +321,39 @@ const NutritionDetailModal = ({ onClose }) => {
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-slate-200 text-slate-500"
+            className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-4 overflow-y-auto space-y-3.5">
-          {/* Graphical Visualizations: SVG Macro Doughnut + Caloric & Fiber Progress Bars */}
-          <div className="rounded-2xl bg-slate-900 text-white p-3.5 flex items-center gap-3.5 shadow-md">
-            <MacroDoughnutChart
-              protein={dailyNutrition.protein}
-              carbs={dailyNutrition.carbs}
-              fats={dailyNutrition.fats}
-              calories={dailyNutrition.calories}
-              targetCalories={dailyNutrition.targetCalories}
-              size={74}
-            />
-            <div className="flex-1 space-y-2 min-w-0">
-              {/* Caloric Budget Progress Bar */}
-              <div>
-                <div className="flex justify-between text-[10px] font-bold mb-0.5">
-                  <span className="text-slate-300 uppercase">Daily Caloric Budget</span>
-                  <span className="text-emerald-300 font-mono">
-                    {dailyNutrition.calories} / {dailyNutrition.targetCalories} kcal
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full transition-all"
-                    style={{ width: `${calPct}%` }}
-                  />
-                </div>
-              </div>
+        <div className="relative z-10 p-4 overflow-y-auto space-y-3.5">
+          {/* Dynamic Daily Allowance Comparison Chart */}
+          <DailyAllowanceComparisonChart dailyNutrition={dailyNutrition} />
 
-              {/* Dietary Fiber Progress Bar */}
-              <div>
-                <div className="flex justify-between text-[10px] font-bold mb-0.5">
-                  <span className="text-slate-300 uppercase">
-                    Fiber &amp; Net Carbs ({dailyNutrition.netCarbs || 0}g Net)
-                  </span>
-                  <span className="text-cyan-300 font-mono">
-                    {dailyNutrition.fiber || 0} / {dailyNutrition.targetFiber || 32}g Fiber
-                  </span>
-                </div>
-                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-cyan-400 rounded-full transition-all"
-                    style={{ width: `${fiberPct}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Macro Legend */}
-              <div className="grid grid-cols-3 gap-1 text-[10px] font-bold pt-0.5">
-                <span className="text-emerald-400">● PRO: {dailyNutrition.protein}g</span>
-                <span className="text-cyan-300">● CARB: {dailyNutrition.carbs}g</span>
-                <span className="text-amber-300">● FAT: {dailyNutrition.fats}g</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Ingredient Entry with Explicit "Enter / Lookup" Button + UPC Barcode Camera Trigger */}
-          <div className="rounded-2xl bg-[#F4F8FB] border border-sky-200 p-3 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold uppercase text-sky-900">
-                Verified Nutritional Lookup (USDA / Baseline Staples)
+          {/* Ingredient Entry with Flexible Serving Text Input + Contained Enter/Lookup Button + UPC Scanner Trigger */}
+          <div className="rounded-2xl bg-slate-900/90 border border-emerald-500/30 p-3 space-y-2.5 overflow-hidden">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-extrabold uppercase text-emerald-300">
+                Nutritional Lookup (USDA Cross-Referenced)
               </span>
               <button
                 type="button"
                 onClick={() => {
-                  onClose();
+                  // Do NOT close the Nutrition modal — opens camera overlay on top so "X" returns here
                   setIsScannerOpen(true);
                 }}
-                className="px-2.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black flex items-center gap-1 shadow-xs"
+                className="px-2.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] font-black flex items-center gap-1 shadow-xs shrink-0"
               >
                 <Camera className="w-3 h-3" />
                 <span>Scan UPC Barcode</span>
               </button>
             </div>
 
-            {/* Quick Verified Staple Selector */}
-            <select
-              defaultValue=""
-              onChange={(e) => handleSelectStaple(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800"
+            <form
+              onSubmit={handleLookupFood}
+              className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 w-full"
             >
-              <option value="">⚡ Instant Staple Lookup (Banana, Eggs, Oats, White Fish, Olive Oil)...</option>
-              {VERIFIED_NUTRIENT_DATABASE.map((item, i) => (
-                <option key={i} value={item.keywords[0]}>
-                  {item.label} ({item.defaultServingGrams}g)
-                </option>
-              ))}
-            </select>
-
-            <form onSubmit={handleLookupFood} className="flex gap-1.5">
               <input
                 type="text"
                 value={foodQuery}
@@ -336,78 +364,78 @@ const NutritionDetailModal = ({ onClose }) => {
                     handleLookupFood(e);
                   }
                 }}
-                placeholder="Type food (e.g. Banana, Eggs, Oats, White Fish, Olive Oil)..."
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold"
+                placeholder="Food/drink (e.g. Black Coffee, Eggs, White Fish)..."
+                className="min-w-0 flex-1 rounded-xl border border-white/15 bg-slate-950 px-2.5 py-2 text-xs font-bold text-white"
               />
               <input
-                type="number"
-                value={foodGrams}
-                onChange={(e) => setFoodGrams(e.target.value)}
-                placeholder="g/ml"
-                className="w-16 rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold"
+                type="text"
+                value={servingText}
+                onChange={(e) => setServingText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleLookupFood(e);
+                  }
+                }}
+                placeholder="e.g. 8 oz, 3/4 cup, 2 tbsp"
+                className="w-28 shrink-0 rounded-xl border border-emerald-400/40 bg-slate-950 px-2 py-2 text-xs font-bold text-emerald-200"
               />
               <button
                 type="submit"
                 disabled={loadingLookup}
-                className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-black flex items-center gap-1 shrink-0"
+                className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black flex items-center justify-center gap-1 shrink-0 max-w-full"
               >
-                <Search className="w-3.5 h-3.5" />
-                <span>{loadingLookup ? '...' : 'Enter / Lookup'}</span>
+                <Search className="w-3.5 h-3.5 shrink-0" />
+                <span className="whitespace-nowrap">
+                  {loadingLookup ? '...' : 'Enter / Lookup'}
+                </span>
               </button>
             </form>
 
-            {/* Auto-Populated Staged Food Result (Never leaves fields blank) */}
+            {/* Staged Lookup Result (Editable before or after adding) */}
             {stagedFood && (
-              <div className="rounded-xl bg-white border border-emerald-300 p-2.5 space-y-2 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-extrabold text-emerald-700 flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    {lastVerifiedSource}
+              <div className="rounded-xl bg-slate-950 border border-emerald-500/40 p-2.5 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-extrabold text-emerald-300 flex items-center gap-1 truncate">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{lastVerifiedSource}</span>
                   </span>
-                  <span className="text-[10px] font-bold text-slate-500">
-                    {stagedFood.servingGrams}g
+                  <span className="text-[10px] font-bold text-slate-400 shrink-0">
+                    {stagedFood.servingInputText} ({stagedFood.servingGrams}g/ml)
                   </span>
                 </div>
 
                 <div className="grid grid-cols-6 gap-1 text-center">
-                  <div className="bg-slate-50 rounded-lg p-1 border border-slate-200">
-                    <div className="text-[8px] font-bold text-slate-500">Kcal</div>
-                    <div className="text-xs font-black text-slate-900">{stagedFood.calories}</div>
+                  <div className="bg-slate-900 rounded-lg p-1 border border-white/10">
+                    <div className="text-[8px] font-bold text-slate-400">Kcal</div>
+                    <div className="text-xs font-black text-white">{stagedFood.calories}</div>
                   </div>
-                  <div className="bg-slate-50 rounded-lg p-1 border border-slate-200">
-                    <div className="text-[8px] font-bold text-slate-500">Protein</div>
-                    <div className="text-xs font-black text-emerald-700">{stagedFood.protein}g</div>
+                  <div className="bg-slate-900 rounded-lg p-1 border border-white/10">
+                    <div className="text-[8px] font-bold text-slate-400">Protein</div>
+                    <div className="text-xs font-black text-emerald-400">{stagedFood.protein}g</div>
                   </div>
-                  <div className="bg-slate-50 rounded-lg p-1 border border-slate-200">
-                    <div className="text-[8px] font-bold text-slate-500">Carbs</div>
-                    <div className="text-xs font-black text-sky-700">{stagedFood.carbs}g</div>
+                  <div className="bg-slate-900 rounded-lg p-1 border border-white/10">
+                    <div className="text-[8px] font-bold text-slate-400">Carbs</div>
+                    <div className="text-xs font-black text-cyan-300">{stagedFood.carbs}g</div>
                   </div>
-                  <div className="bg-slate-50 rounded-lg p-1 border border-slate-200">
-                    <div className="text-[8px] font-bold text-slate-500">Fiber</div>
-                    <div className="text-xs font-black text-teal-700">{stagedFood.fiber}g</div>
+                  <div className="bg-slate-900 rounded-lg p-1 border border-white/10">
+                    <div className="text-[8px] font-bold text-slate-400">Fiber</div>
+                    <div className="text-xs font-black text-violet-300">{stagedFood.fiber}g</div>
                   </div>
-                  <div className="bg-slate-50 rounded-lg p-1 border border-slate-200">
-                    <div className="text-[8px] font-bold text-slate-500">Net C</div>
-                    <div className="text-xs font-black text-cyan-700">{stagedFood.netCarbs}g</div>
+                  <div className="bg-slate-900 rounded-lg p-1 border border-white/10">
+                    <div className="text-[8px] font-bold text-slate-400">Net C</div>
+                    <div className="text-xs font-black text-teal-300">{stagedFood.netCarbs}g</div>
                   </div>
-                  <div className="bg-slate-50 rounded-lg p-1 border border-slate-200">
-                    <div className="text-[8px] font-bold text-slate-500">Fats</div>
-                    <div className="text-xs font-black text-amber-700">{stagedFood.fats}g</div>
+                  <div className="bg-slate-900 rounded-lg p-1 border border-white/10">
+                    <div className="text-[8px] font-bold text-slate-400">Fats</div>
+                    <div className="text-xs font-black text-amber-300">{stagedFood.fats}g</div>
                   </div>
-                </div>
-
-                <div className="text-[10px] text-slate-600 flex flex-wrap gap-2 font-semibold">
-                  <span>Na: {stagedFood.micros?.sodium || 0}mg</span>
-                  <span>K: {stagedFood.micros?.potassium || 0}mg</span>
-                  <span>Mg: {stagedFood.micros?.magnesium || 0}mg</span>
-                  <span>Vit C: {stagedFood.micros?.vitaminC || 0}mg</span>
-                  <span>Leu: {stagedFood.aminos?.leucine || 0}mg</span>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleCommitStagedFood}
-                  className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center justify-center gap-1"
+                  className="w-full py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black flex items-center justify-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add {stagedFood.name} to Daily Totals</span>
@@ -416,22 +444,54 @@ const NutritionDetailModal = ({ onClose }) => {
             )}
           </div>
 
+          {/* Logged Daily Meals List (Real-time delete updates the comparison chart) */}
+          {(dailyNutrition.meals || []).length > 0 && (
+            <div className="rounded-2xl bg-slate-900/90 border border-white/15 p-3 space-y-1.5">
+              <div className="text-[10px] font-extrabold uppercase text-slate-400">
+                Today&apos;s Logged Items ({dailyNutrition.meals.length})
+              </div>
+              <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                {dailyNutrition.meals.map((meal) => (
+                  <div
+                    key={meal.id}
+                    className="flex items-center justify-between bg-slate-950 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-bold text-white truncate">{meal.name}</div>
+                      <div className="text-[10px] text-slate-400">
+                        {meal.calories} kcal • {meal.protein}g P • {meal.carbs}g C • {meal.fats}g F
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveMealFromDaily(meal.id)}
+                      className="p-1 text-rose-400 hover:text-rose-300 shrink-0"
+                      title="Remove item and update daily chart"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Direct Editable Daily Totals */}
           <div className="space-y-1.5">
-            <div className="text-[10px] font-extrabold uppercase text-slate-500">
-              Edit Daily Nutrition Totals Directly
+            <div className="text-[10px] font-extrabold uppercase text-slate-400">
+              Edit Daily Nutrition &amp; Allowance Targets Directly
             </div>
             <div className="grid grid-cols-3 gap-2">
               {[
                 { label: 'Calories', key: 'calories' },
-                { label: 'Target Kcal', key: 'targetCalories' },
+                { label: 'Max Kcal', key: 'targetCalories' },
                 { label: 'Protein (g)', key: 'protein' },
                 { label: 'Total Carbs (g)', key: 'carbs' },
                 { label: 'Fiber (g)', key: 'fiber' },
                 { label: 'Fats (g)', key: 'fats' },
               ].map(({ label, key }) => (
                 <div key={key}>
-                  <label className="block text-[9px] font-extrabold text-slate-600 uppercase mb-0.5">
+                  <label className="block text-[9px] font-extrabold text-slate-400 uppercase mb-0.5">
                     {label}
                   </label>
                   <input
@@ -448,7 +508,7 @@ const NutritionDetailModal = ({ onClose }) => {
                         return updated;
                       });
                     }}
-                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold"
+                    className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-white"
                   />
                 </div>
               ))}
@@ -461,10 +521,46 @@ const NutritionDetailModal = ({ onClose }) => {
 };
 
 /**
- * Tile 4 Modal: Athletic Training & Dynamic Calorie / Heart Rate Calculators
- * 1. Spin Bike (Duration, Avg HR, 15-Sec Pulse × 4 Calculator, 5 HR Zones for Age 53, Active Fat Burn Zone highlight)
- * 2. Ab Wheel Rollouts (Strictly Body Weight lbs/kg, Reps, Sets, Kneeling/Standing — Mechanical Work Formula)
- * 3. Resistance Bands (Strictly Band Rating lbs tension, Reps, Sets — Mechanical Volume Load)
+ * Expanded Exercise Library Catalog for Section 6
+ */
+const RESISTANCE_BAND_MOVEMENTS = [
+  'Band Lat Pulldowns (Back / V-Taper)',
+  'Band Seated Rows (Mid-Back Thickness)',
+  'Band Face Pulls (Rear Delts / Rotator Cuff)',
+  'Band Pull-Aparts (Upper Back / Rhomboids)',
+  'Band-Resisted Chest Press (Pectorals)',
+  'Banded Bicep Curls (Peak Contraction)',
+  'Banded Tricep Pushdowns (Lateral Head)',
+  'Band Lateral Deltoid Raises (Medial Delts)',
+];
+
+const FREE_WEIGHT_MOVEMENTS = [
+  'Dumbbell Hammer Curls',
+  'Goblet Squats',
+  'Romanian Deadlifts (RDLs)',
+  'Dumbbell Overhead Press',
+  'Bent-Over Dumbbell Rows',
+  'Dumbbell Bench / Floor Press',
+];
+
+const CALISTHENIC_MOVEMENTS = [
+  { name: 'Ab Wheel Rollouts (Kneeling / Standing)', mode: 'abwheel' },
+  { name: 'Standard Planks (Timed)', mode: 'timed', met: 4.5 },
+  { name: 'Side Planks (Timed)', mode: 'timed', met: 4.8 },
+  { name: 'Mountain Climbers', mode: 'reps', disp: 0.45, density: 4.2 },
+  { name: 'Bodyweight Box Step-Ups', mode: 'reps', disp: 0.55, density: 4.8 },
+  { name: 'Push-Up Variations', mode: 'reps', disp: 0.48, density: 4.0 },
+  { name: 'Hanging / Lying Knee Raises', mode: 'reps', disp: 0.50, density: 3.8 },
+];
+
+/**
+ * Tile 4 Modal: Athletic Training & Expanded Exercise Library
+ * - Maintains active dark-glass theme & TILE_BACKGROUNDS.activity backdrop
+ * - 4 Sub-tabs:
+ *   1. Spin Bike (HR & 15s Pulse × 4 Calculator + 5 Zones for Age 53)
+ *   2. Resistance Bands (8 expanded movements: Face pulls, pull-aparts, chest press, lat pulldowns, seated rows, bicep curls, tricep pushdowns, lateral deltoid raises)
+ *   3. Free Weights (6 movements: DB hammer curls, goblet squats, RDLs, DB overhead press, bent-over DB rows, DB bench/floor press)
+ *   4. Calisthenics & Plyometrics (Ab wheel rollouts, standard planks, side planks, mountain climbers, box step-ups, push-up variations, hanging/lying knee raises)
  */
 const AthleticTrainingModal = ({ onClose }) => {
   const {
@@ -476,15 +572,15 @@ const AthleticTrainingModal = ({ onClose }) => {
 
   const [activeSubTab, setActiveSubTab] = useState('spin');
 
-  // 1. Spin Bike State
-  const [spinMinutes, setSpinMinutes] = useState(30);
-  const [pulseCount15Sec, setPulseCount15Sec] = useState('');
-  const [avgBpm, setAvgBpm] = useState(112); // Zone 2 default for Age 53 (Max HR 167 -> Zone 2 is 100-117 BPM)
-
   const athleteAge = Number(userProfile.age) || 53;
   const maxHr = Number(userProfile.maxHr) || 220 - athleteAge;
   const bodyWeightLbs = Number(userProfile.weightLbs) || 229;
   const bodyWeightKg = bodyWeightLbs * 0.45359237;
+
+  // 1. Spin Bike State
+  const [spinMinutes, setSpinMinutes] = useState(30);
+  const [pulseCount15Sec, setPulseCount15Sec] = useState('');
+  const [avgBpm, setAvgBpm] = useState(112);
 
   const hrZones = useMemo(
     () => [
@@ -540,7 +636,6 @@ const AthleticTrainingModal = ({ onClose }) => {
     );
   }, [avgBpm, hrZones]);
 
-  // Calorie burn = (MET * 3.5 * weightKg / 200) * durationMinutes
   const spinCalories = useMemo(() => {
     const mins = Math.max(0, Number(spinMinutes) || 0);
     const met = activeSpinZone?.met || 6.8;
@@ -555,39 +650,8 @@ const AthleticTrainingModal = ({ onClose }) => {
     }
   };
 
-  // 2. Ab Wheel Rollouts State (Strictly Body Weight, Reps, Sets, Kneeling vs. Standing)
-  const [abWeightUnit, setAbWeightUnit] = useState('lbs');
-  const [abWeightValue, setAbWeightValue] = useState(bodyWeightLbs);
-  const [abReps, setAbReps] = useState(12);
-  const [abSets, setAbSets] = useState(3);
-  const [abStance, setAbStance] = useState('kneeling'); // 'kneeling' (0.85m) | 'standing' (1.25m)
-
-  const abCalculation = useMemo(() => {
-    const totalReps = Math.max(0, (Number(abReps) || 0) * (Number(abSets) || 0));
-    const weightKg =
-      abWeightUnit === 'kg'
-        ? Number(abWeightValue) || 0
-        : (Number(abWeightValue) || 0) * 0.45359237;
-    const displacementMeters = abStance === 'standing' ? 1.25 : 0.85;
-
-    // Exact mechanical work formula: Total Reps * ((WeightKg * 9.80665 * Displacement) / (4184 * 0.23))
-    const rawMechanicalKcal =
-      totalReps * ((weightKg * 9.80665 * displacementMeters) / (4184 * 0.23));
-    // Calisthenic MET 6.0 set-volume density adjustment (anti-extension isometric core stabilization)
-    const setDensityKcal = (Number(abSets) || 0) * 3.2;
-    const totalKcal = Math.max(1, Math.round((rawMechanicalKcal + setDensityKcal) * 10) / 10);
-
-    return {
-      totalReps,
-      weightKg: weightKg.toFixed(1),
-      displacementMeters,
-      rawMechanicalKcal: rawMechanicalKcal.toFixed(2),
-      totalKcal: Math.round(totalKcal),
-    };
-  }, [abWeightUnit, abWeightValue, abReps, abSets, abStance]);
-
-  // 3. Resistance Bands State (Strictly Band Rating lbs tension, Reps, Sets)
-  const [bandFocus, setBandFocus] = useState('Back / V-Taper (Lat Pulldown & Row)');
+  // 2. Resistance Bands State
+  const [bandMovement, setBandMovement] = useState(RESISTANCE_BAND_MOVEMENTS[0]);
   const [bandTensionLbs, setBandTensionLbs] = useState(60);
   const [bandReps, setBandReps] = useState(12);
   const [bandSets, setBandSets] = useState(4);
@@ -598,7 +662,6 @@ const AthleticTrainingModal = ({ onClose }) => {
     const sets = Math.max(0, Number(bandSets) || 0);
     const totalReps = reps * sets;
     const totalVolumeLbs = tensionLbs * totalReps;
-    // Mechanical work expenditure from resistance volume (lbs * reps * sets) & eccentric time-under-tension density
     const forceNewtons = tensionLbs * 4.44822;
     const strokeMeters = 0.65;
     const mechanicalKcal = (totalReps * forceNewtons * strokeMeters) / (4184 * 0.22);
@@ -612,77 +675,161 @@ const AthleticTrainingModal = ({ onClose }) => {
     };
   }, [bandTensionLbs, bandReps, bandSets]);
 
+  // 3. Free Weights State
+  const [freeWeightMovement, setFreeWeightMovement] = useState(FREE_WEIGHT_MOVEMENTS[0]);
+  const [freeWeightLbs, setFreeWeightLbs] = useState(45);
+  const [freeWeightReps, setFreeWeightReps] = useState(10);
+  const [freeWeightSets, setFreeWeightSets] = useState(4);
+
+  const freeWeightCalculation = useMemo(() => {
+    const loadLbs = Math.max(0, Number(freeWeightLbs) || 0);
+    const reps = Math.max(0, Number(freeWeightReps) || 0);
+    const sets = Math.max(0, Number(freeWeightSets) || 0);
+    const totalReps = reps * sets;
+    const totalVolumeLbs = loadLbs * totalReps;
+    const forceNewtons = loadLbs * 4.44822;
+    const strokeMeters = 0.60;
+    const mechanicalKcal = (totalReps * forceNewtons * strokeMeters) / (4184 * 0.21);
+    const systemicBonus = sets * 5.2;
+    const calories = Math.max(1, Math.round(mechanicalKcal + systemicBonus));
+
+    return {
+      totalReps,
+      totalVolumeLbs,
+      calories,
+    };
+  }, [freeWeightLbs, freeWeightReps, freeWeightSets]);
+
+  // 4. Calisthenics, Ab Wheel & Plyometrics State
+  const [calisthenicMovement, setCalisthenicMovement] = useState(CALISTHENIC_MOVEMENTS[0].name);
+  const [abWeightUnit, setAbWeightUnit] = useState('lbs');
+  const [abWeightValue, setAbWeightValue] = useState(bodyWeightLbs);
+  const [abReps, setAbReps] = useState(12);
+  const [abSets, setAbSets] = useState(3);
+  const [abStance, setAbStance] = useState('kneeling');
+  const [plankSecondsPerSet, setPlankSecondsPerSet] = useState(60);
+
+  const selectedCalisthenicObj = useMemo(
+    () =>
+      CALISTHENIC_MOVEMENTS.find((m) => m.name === calisthenicMovement) ||
+      CALISTHENIC_MOVEMENTS[0],
+    [calisthenicMovement]
+  );
+
+  const calisthenicCalculation = useMemo(() => {
+    const sets = Math.max(1, Number(abSets) || 1);
+    const weightKg =
+      abWeightUnit === 'kg'
+        ? Number(abWeightValue) || 0
+        : (Number(abWeightValue) || 0) * 0.45359237;
+
+    if (selectedCalisthenicObj.mode === 'timed') {
+      const totalSec = sets * (Number(plankSecondsPerSet) || 60);
+      const mins = totalSec / 60;
+      const kcal = Math.max(1, Math.round((((selectedCalisthenicObj.met || 4.5) * 3.5 * weightKg) / 200) * mins + sets * 2.5));
+      return {
+        summaryLabel: `${sets} sets × ${plankSecondsPerSet}s hold (${totalSec}s total)`,
+        totalKcal: kcal,
+        detailText: `Isometric Core / Stabilization (${weightKg.toFixed(1)} kg)`,
+      };
+    }
+
+    const totalReps = Math.max(0, (Number(abReps) || 0) * sets);
+    const displacementMeters =
+      selectedCalisthenicObj.mode === 'abwheel'
+        ? abStance === 'standing'
+          ? 1.25
+          : 0.85
+        : selectedCalisthenicObj.disp || 0.5;
+
+    const rawMechanicalKcal =
+      totalReps * ((weightKg * 9.80665 * displacementMeters) / (4184 * 0.23));
+    const setDensityKcal = sets * (selectedCalisthenicObj.density || 3.2);
+    const totalKcal = Math.max(1, Math.round(rawMechanicalKcal + setDensityKcal));
+
+    return {
+      summaryLabel:
+        selectedCalisthenicObj.mode === 'abwheel'
+          ? `${abStance} • ${abWeightValue}${abWeightUnit} • ${abReps} reps × ${sets} sets`
+          : `${abWeightValue}${abWeightUnit} • ${abReps} reps × ${sets} sets`,
+      totalKcal,
+      detailText: `Mass: ${weightKg.toFixed(1)} kg • Disp: ${displacementMeters} m • Work: ${rawMechanicalKcal.toFixed(2)} kcal + Density`,
+    };
+  }, [
+    selectedCalisthenicObj,
+    abWeightUnit,
+    abWeightValue,
+    abReps,
+    abSets,
+    abStance,
+    plankSecondsPerSet,
+  ]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-hidden flex flex-col text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-3 overflow-y-auto">
+      <div className="relative bg-slate-950 border border-white/15 rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-hidden flex flex-col text-white">
+        {/* Consistent Tile Background Image + Dark Glass Backdrop */}
+        <img
+          src={TILE_BACKGROUNDS.activity}
+          alt="Athletic Training Backdrop"
+          className="absolute inset-0 w-full h-full object-cover object-center opacity-25 pointer-events-none"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/92 to-slate-950/95 pointer-events-none" />
+
         {/* Header */}
-        <div className="px-4 py-3.5 bg-[#F4F8FB] border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-2xl bg-indigo-600 text-white">
+        <div className="relative z-10 px-4 py-3.5 bg-slate-900/90 border-b border-white/15 flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-2 rounded-2xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 shrink-0">
               <Dumbbell className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-sm font-black text-slate-900">
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-white truncate">
                 Athletic Training &amp; Load Calculators
               </h2>
-              <p className="text-[11px] text-slate-500">
-                Spin Bike HR Zones • Ab Wheel Mechanical Work • Band Volume
+              <p className="text-[11px] text-slate-400 truncate">
+                Spin HR • Bands • Free Weights • Calisthenics &amp; Ab Wheel
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-slate-200 text-slate-500"
+            className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modality Sub-Tabs */}
-        <div className="grid grid-cols-3 bg-slate-100 p-1 mx-4 mt-3 rounded-2xl">
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('spin')}
-            className={`py-1.5 rounded-xl text-[11px] font-black transition ${
-              activeSubTab === 'spin'
-                ? 'bg-white text-indigo-700 shadow-xs'
-                : 'text-slate-600'
-            }`}
-          >
-            1. Spin Bike HR
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('abwheel')}
-            className={`py-1.5 rounded-xl text-[11px] font-black transition ${
-              activeSubTab === 'abwheel'
-                ? 'bg-white text-indigo-700 shadow-xs'
-                : 'text-slate-600'
-            }`}
-          >
-            2. Ab Wheel
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('bands')}
-            className={`py-1.5 rounded-xl text-[11px] font-black transition ${
-              activeSubTab === 'bands'
-                ? 'bg-white text-indigo-700 shadow-xs'
-                : 'text-slate-600'
-            }`}
-          >
-            3. Bands (lbs)
-          </button>
+        {/* 4 Modality Sub-Tabs */}
+        <div className="relative z-10 grid grid-cols-4 gap-1 bg-slate-900/90 p-1 mx-4 mt-3 rounded-2xl border border-white/10">
+          {[
+            { id: 'spin', label: 'Spin HR' },
+            { id: 'bands', label: 'Bands' },
+            { id: 'weights', label: 'Weights' },
+            { id: 'calisthenics', label: 'Core/Plyo' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveSubTab(tab.id)}
+              className={`py-1.5 rounded-xl text-[10px] font-black transition truncate ${
+                activeSubTab === tab.id
+                  ? 'bg-indigo-500 text-slate-950 shadow-xs'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        <div className="p-4 overflow-y-auto space-y-3.5">
+        <div className="relative z-10 p-4 overflow-y-auto space-y-3.5">
           {/* TAB 1: SPIN BIKE (HEART RATE & ZONES) */}
           {activeSubTab === 'spin' && (
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                  <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
                     Duration (Min)
                   </label>
                   <input
@@ -690,11 +837,11 @@ const AthleticTrainingModal = ({ onClose }) => {
                     min="1"
                     value={spinMinutes}
                     onChange={(e) => setSpinMinutes(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-black"
+                    className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-extrabold text-rose-700 uppercase mb-1">
+                  <label className="block text-[10px] font-extrabold text-rose-300 uppercase mb-1">
                     15s Pulse (×4)
                   </label>
                   <input
@@ -702,29 +849,28 @@ const AthleticTrainingModal = ({ onClose }) => {
                     value={pulseCount15Sec}
                     onChange={(e) => handlePulse15Change(e.target.value)}
                     placeholder="e.g. 28 → 112"
-                    className="w-full rounded-xl border border-rose-300 bg-rose-50/50 px-2.5 py-1.5 text-xs font-black text-rose-900"
+                    className="w-full rounded-xl border border-rose-400/50 bg-rose-950/40 px-2.5 py-1.5 text-xs font-black text-rose-200"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                  <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
                     Avg HR (BPM)
                   </label>
                   <input
                     type="number"
                     value={avgBpm}
                     onChange={(e) => setAvgBpm(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-black"
+                    className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white"
                   />
                 </div>
               </div>
 
-              {/* Dynamic Training Zones Table based on Age (53 -> Max HR 167) */}
-              <div className="rounded-2xl border border-slate-200 bg-[#F4F8FB] p-3 space-y-1.5">
-                <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-slate-600">
+              <div className="rounded-2xl border border-white/15 bg-slate-900/90 p-3 space-y-1.5">
+                <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-slate-300">
                   <span>
                     Age {athleteAge} HR Zones (Max HR: {maxHr} BPM)
                   </span>
-                  <span className="text-emerald-700">★ Zone 2 Fat Burn Target</span>
+                  <span className="text-emerald-400">★ Zone 2 Fat Burn Target</span>
                 </div>
                 <div className="space-y-1">
                   {hrZones.map((z) => {
@@ -735,11 +881,11 @@ const AthleticTrainingModal = ({ onClose }) => {
                         className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[11px] border transition ${
                           z.isFatBurn
                             ? isCurrent
-                              ? 'bg-emerald-600 text-white border-emerald-700 font-black shadow-xs'
-                              : 'bg-emerald-50 text-emerald-950 border-emerald-300 font-extrabold'
+                              ? 'bg-emerald-500 text-slate-950 border-emerald-300 font-black shadow-xs'
+                              : 'bg-emerald-950/60 text-emerald-200 border-emerald-500/40 font-extrabold'
                             : isCurrent
-                            ? 'bg-indigo-600 text-white border-indigo-700 font-black'
-                            : 'bg-white text-slate-700 border-slate-200/80 font-semibold'
+                            ? 'bg-indigo-500 text-slate-950 border-indigo-300 font-black'
+                            : 'bg-slate-950 text-slate-300 border-white/10 font-semibold'
                         }`}
                       >
                         <div className="flex items-center gap-1.5">
@@ -759,14 +905,14 @@ const AthleticTrainingModal = ({ onClose }) => {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-indigo-50 border border-indigo-200 p-3 flex items-center justify-between">
+              <div className="rounded-2xl bg-indigo-950/60 border border-indigo-500/40 p-3 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] font-bold uppercase text-indigo-700">
+                  <div className="text-[10px] font-bold uppercase text-indigo-300">
                     Active Zone: {activeSpinZone?.zone}
                   </div>
-                  <div className="text-sm font-black text-slate-900">
+                  <div className="text-sm font-black text-white">
                     Estimated Burn: {spinCalories} kcal{' '}
-                    <span className="text-xs font-semibold text-slate-600">
+                    <span className="text-xs font-semibold text-slate-400">
                       ({spinMinutes} min @ {avgBpm} BPM)
                     </span>
                   </div>
@@ -781,7 +927,7 @@ const AthleticTrainingModal = ({ onClose }) => {
                       durationMinutes: Number(spinMinutes) || 0,
                     })
                   }
-                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black flex items-center gap-1"
+                  className="px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-black flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Log Spin</span>
@@ -790,139 +936,29 @@ const AthleticTrainingModal = ({ onClose }) => {
             </div>
           )}
 
-          {/* TAB 2: AB WHEEL ROLLOUTS (STRICTLY BODY WEIGHT, REPS, SETS) */}
-          {activeSubTab === 'abwheel' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
-                    Body Weight
-                  </label>
-                  <div className="flex rounded-xl border border-slate-200 bg-white overflow-hidden">
-                    <input
-                      type="number"
-                      value={abWeightValue}
-                      onChange={(e) => setAbWeightValue(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs font-black"
-                    />
-                    <select
-                      value={abWeightUnit}
-                      onChange={(e) => setAbWeightUnit(e.target.value)}
-                      className="bg-slate-100 px-2 text-[10px] font-extrabold border-l border-slate-200"
-                    >
-                      <option value="lbs">lbs</option>
-                      <option value="kg">kg</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
-                    Rollout Mechanics
-                  </label>
-                  <select
-                    value={abStance}
-                    onChange={(e) => setAbStance(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold"
-                  >
-                    <option value="kneeling">Kneeling Rollout (0.85m disp)</option>
-                    <option value="standing">Standing Rollout (1.25m disp)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
-                    Reps per Set
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={abReps}
-                    onChange={(e) => setAbReps(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-black"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
-                    Total Sets
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={abSets}
-                    onChange={(e) => setAbSets(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-black"
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-[#F4F8FB] border border-slate-200 p-3 space-y-1 text-[11px]">
-                <div className="font-extrabold text-slate-800">
-                  Calisthenic Mechanical Work Model ({abCalculation.totalReps} Total Reps)
-                </div>
-                <div className="text-slate-600 font-mono text-[10px]">
-                  Mass: {abCalculation.weightKg} kg • Displacement: {abCalculation.displacementMeters} m • Work: {abCalculation.rawMechanicalKcal} kcal + Core Isometric Density
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-indigo-50 border border-indigo-200 p-3 flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] font-bold uppercase text-indigo-700">
-                    {abSets} Sets × {abReps} Reps ({abStance})
-                  </div>
-                  <div className="text-sm font-black text-slate-900">
-                    Expenditure: {abCalculation.totalKcal} kcal
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    addTrainingSession({
-                      type: 'Ab Wheel Rollouts',
-                      summary: `${abStance} • ${abWeightValue}${abWeightUnit} • ${abReps} reps × ${abSets} sets`,
-                      calories: abCalculation.totalKcal,
-                    })
-                  }
-                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Log Ab Wheel</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: RESISTANCE BANDS (STRICTLY BAND TENSION LBS, REPS, SETS) */}
+          {/* TAB 2: EXPANDED RESISTANCE BAND MOVEMENTS */}
           {activeSubTab === 'bands' && (
             <div className="space-y-3">
               <div>
-                <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
-                  Target Muscle Group (Dan&apos;s V-Taper Protocol)
+                <label className="block text-[10px] font-extrabold text-indigo-300 uppercase mb-1">
+                  Resistance Band Exercise Selection
                 </label>
                 <select
-                  value={bandFocus}
-                  onChange={(e) => setBandFocus(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold"
+                  value={bandMovement}
+                  onChange={(e) => setBandMovement(e.target.value)}
+                  className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-2 text-xs font-bold text-white"
                 >
-                  <option value="Back / V-Taper (Lat Pulldown & Seated Row)">
-                    Back / V-Taper (Lat Pulldown &amp; Seated Row)
-                  </option>
-                  <option value="Chest (Banded Press & Crossover Fly)">
-                    Chest (Banded Press &amp; Crossover Fly)
-                  </option>
-                  <option value="Biceps (Strict Banded Peak Curl)">
-                    Biceps (Strict Banded Peak Curl)
-                  </option>
-                  <option value="Shoulders / Rear Delts (Face Pulls)">
-                    Shoulders / Rear Delts (Face Pulls)
-                  </option>
+                  {RESISTANCE_BAND_MOVEMENTS.map((mv) => (
+                    <option key={mv} value={mv} className="bg-slate-900 text-white">
+                      {mv}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                  <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
                     Band Rating (lbs)
                   </label>
                   <input
@@ -931,11 +967,11 @@ const AthleticTrainingModal = ({ onClose }) => {
                     step="5"
                     value={bandTensionLbs}
                     onChange={(e) => setBandTensionLbs(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-black"
+                    className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                  <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
                     Reps
                   </label>
                   <input
@@ -943,11 +979,11 @@ const AthleticTrainingModal = ({ onClose }) => {
                     min="1"
                     value={bandReps}
                     onChange={(e) => setBandReps(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-black"
+                    className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                  <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
                     Sets
                   </label>
                   <input
@@ -955,19 +991,19 @@ const AthleticTrainingModal = ({ onClose }) => {
                     min="1"
                     value={bandSets}
                     onChange={(e) => setBandSets(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-black"
+                    className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white"
                   />
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-indigo-50 border border-indigo-200 p-3 flex items-center justify-between">
+              <div className="rounded-2xl bg-indigo-950/60 border border-indigo-500/40 p-3 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] font-bold uppercase text-indigo-700">
-                    Mechanical Load Volume: {bandCalculation.totalVolumeLbs.toLocaleString()} lbs
+                  <div className="text-[10px] font-bold uppercase text-indigo-300">
+                    Volume Load: {bandCalculation.totalVolumeLbs.toLocaleString()} lbs
                   </div>
-                  <div className="text-sm font-black text-slate-900">
+                  <div className="text-sm font-black text-white">
                     Expenditure: {bandCalculation.calories} kcal{' '}
-                    <span className="text-xs font-semibold text-slate-600">
+                    <span className="text-xs font-semibold text-slate-400">
                       ({bandCalculation.totalReps} total reps)
                     </span>
                   </div>
@@ -976,12 +1012,12 @@ const AthleticTrainingModal = ({ onClose }) => {
                   type="button"
                   onClick={() =>
                     addTrainingSession({
-                      type: 'Resistance Bands',
-                      summary: `${bandFocus.split(' (')[0]} • ${bandTensionLbs} lbs × ${bandReps} reps × ${bandSets} sets`,
+                      type: `Bands: ${bandMovement.split(' (')[0]}`,
+                      summary: `${bandTensionLbs} lbs × ${bandReps} reps × ${bandSets} sets`,
                       calories: bandCalculation.calories,
                     })
                   }
-                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black flex items-center gap-1"
+                  className="px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-black flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Log Bands</span>
@@ -990,11 +1026,257 @@ const AthleticTrainingModal = ({ onClose }) => {
             </div>
           )}
 
+          {/* TAB 3: FREE WEIGHT MOVEMENTS */}
+          {activeSubTab === 'weights' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-extrabold text-indigo-300 uppercase mb-1">
+                  Free Weight Exercise Selection
+                </label>
+                <select
+                  value={freeWeightMovement}
+                  onChange={(e) => setFreeWeightMovement(e.target.value)}
+                  className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-2 text-xs font-bold text-white"
+                >
+                  {FREE_WEIGHT_MOVEMENTS.map((mv) => (
+                    <option key={mv} value={mv} className="bg-slate-900 text-white">
+                      {mv}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+                    Load (lbs)
+                  </label>
+                  <input
+                    type="number"
+                    min="5"
+                    step="2.5"
+                    value={freeWeightLbs}
+                    onChange={(e) => setFreeWeightLbs(e.target.value)}
+                    className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+                    Reps
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={freeWeightReps}
+                    onChange={(e) => setFreeWeightReps(e.target.value)}
+                    className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+                    Sets
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={freeWeightSets}
+                    onChange={(e) => setFreeWeightSets(e.target.value)}
+                    className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-indigo-950/60 border border-indigo-500/40 p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] font-bold uppercase text-indigo-300">
+                    Total Volume: {freeWeightCalculation.totalVolumeLbs.toLocaleString()} lbs
+                  </div>
+                  <div className="text-sm font-black text-white">
+                    Expenditure: {freeWeightCalculation.calories} kcal{' '}
+                    <span className="text-xs font-semibold text-slate-400">
+                      ({freeWeightCalculation.totalReps} total reps)
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    addTrainingSession({
+                      type: freeWeightMovement,
+                      summary: `${freeWeightLbs} lbs × ${freeWeightReps} reps × ${freeWeightSets} sets`,
+                      calories: freeWeightCalculation.calories,
+                    })
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-black flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Log Weights</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: CALISTHENICS, AB WHEEL & PLYOMETRICS */}
+          {activeSubTab === 'calisthenics' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-extrabold text-indigo-300 uppercase mb-1">
+                  Calisthenics, Core &amp; Plyometrics Movement
+                </label>
+                <select
+                  value={calisthenicMovement}
+                  onChange={(e) => setCalisthenicMovement(e.target.value)}
+                  className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-2 text-xs font-bold text-white"
+                >
+                  {CALISTHENIC_MOVEMENTS.map((mv) => (
+                    <option key={mv.name} value={mv.name} className="bg-slate-900 text-white">
+                      {mv.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+                    Body Weight
+                  </label>
+                  <div className="flex rounded-xl border border-white/15 bg-slate-900 overflow-hidden">
+                    <input
+                      type="number"
+                      value={abWeightValue}
+                      onChange={(e) => setAbWeightValue(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs font-black text-white bg-transparent"
+                    />
+                    <select
+                      value={abWeightUnit}
+                      onChange={(e) => setAbWeightUnit(e.target.value)}
+                      className="bg-slate-800 px-2 text-[10px] font-extrabold text-indigo-300 border-l border-white/15"
+                    >
+                      <option value="lbs">lbs</option>
+                      <option value="kg">kg</option>
+                    </select>
+                  </div>
+                </div>
+
+                {selectedCalisthenicObj.mode === 'abwheel' ? (
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+                      Rollout Stance
+                    </label>
+                    <select
+                      value={abStance}
+                      onChange={(e) => setAbStance(e.target.value)}
+                      className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-white"
+                    >
+                      <option value="kneeling" className="bg-slate-900">
+                        Kneeling Rollout (0.85m)
+                      </option>
+                      <option value="standing" className="bg-slate-900">
+                        Standing Rollout (1.25m)
+                      </option>
+                    </select>
+                  </div>
+                ) : selectedCalisthenicObj.mode === 'timed' ? (
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+                      Hold Duration (Sec)
+                    </label>
+                    <input
+                      type="number"
+                      min="10"
+                      step="5"
+                      value={plankSecondsPerSet}
+                      onChange={(e) => setPlankSecondsPerSet(e.target.value)}
+                      className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+                      Reps per Set
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={abReps}
+                      onChange={(e) => setAbReps(e.target.value)}
+                      className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {selectedCalisthenicObj.mode === 'abwheel' && (
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+                      Reps per Set
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={abReps}
+                      onChange={(e) => setAbReps(e.target.value)}
+                      className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white"
+                    />
+                  </div>
+                )}
+                <div className={selectedCalisthenicObj.mode === 'abwheel' ? '' : 'col-span-2'}>
+                  <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+                    Total Sets
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={abSets}
+                    onChange={(e) => setAbSets(e.target.value)}
+                    className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-slate-900/90 border border-white/15 p-3 space-y-1 text-[11px]">
+                <div className="font-extrabold text-indigo-300">
+                  Mechanical Work &amp; Calisthenic Load Model
+                </div>
+                <div className="text-slate-300 font-mono text-[10px]">
+                  {calisthenicCalculation.detailText}
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-indigo-950/60 border border-indigo-500/40 p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] font-bold uppercase text-indigo-300">
+                    {calisthenicCalculation.summaryLabel}
+                  </div>
+                  <div className="text-sm font-black text-white">
+                    Expenditure: {calisthenicCalculation.totalKcal} kcal
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    addTrainingSession({
+                      type: calisthenicMovement.split(' (')[0],
+                      summary: calisthenicCalculation.summaryLabel,
+                      calories: calisthenicCalculation.totalKcal,
+                    })
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-xs font-black flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Log Set</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Logged Athletic Training Sessions Today */}
-          <div className="rounded-2xl border border-slate-200 p-3 bg-white space-y-2">
-            <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-slate-600">
+          <div className="rounded-2xl border border-white/15 p-3 bg-slate-900/90 space-y-2">
+            <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-slate-300">
               <span>Today&apos;s Logged Training ({dailyActivity.trainingLogs?.length || 0})</span>
-              <span className="text-indigo-700">
+              <span className="text-indigo-300">
                 Total Burned: {dailyActivity.caloriesBurned} kcal
               </span>
             </div>
@@ -1002,20 +1284,20 @@ const AthleticTrainingModal = ({ onClose }) => {
               {(dailyActivity.trainingLogs || []).map((log) => (
                 <div
                   key={log.id}
-                  className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1.5 text-xs"
+                  className="flex items-center justify-between bg-slate-950 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs"
                 >
                   <div className="min-w-0">
-                    <div className="font-black text-slate-900">{log.type}</div>
-                    <div className="text-[10px] text-slate-600 truncate">{log.summary}</div>
+                    <div className="font-black text-white truncate">{log.type}</div>
+                    <div className="text-[10px] text-slate-400 truncate">{log.summary}</div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono font-black text-indigo-700">
+                    <span className="font-mono font-black text-indigo-300">
                       {log.calories} kcal
                     </span>
                     <button
                       type="button"
                       onClick={() => deleteTrainingSession(log.id)}
-                      className="text-rose-500 hover:text-rose-700"
+                      className="text-rose-400 hover:text-rose-300"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -1062,7 +1344,7 @@ function DashboardContent() {
     desiredDoseValue: 3,
     desiredDoseUnit: 'mg',
     syringeUnits: 60,
-    site: 'Abdomen (Periumbilical, left/right)',
+    site: 'Lower Left Abdomen',
   };
 
   const calPct = Math.min(
@@ -1074,26 +1356,25 @@ function DashboardContent() {
     Math.round(((dailyNutrition.fiber || 0) / Math.max(1, dailyNutrition.targetFiber || 32)) * 100)
   );
 
-  // 4 Core Dashboard Tiles (Morning Stack at Top-Left, Nutrition at Top-Right, Peptides at Bottom-Left, Athletic Training at Bottom-Right)
+  // 4 Core Dashboard Tiles ("Get Stacked" at Top-Left, Nutrition at Top-Right, Peptides at Bottom-Left, Athletic Training at Bottom-Right)
   const tiles = [
     {
       id: 'stacks',
-      title: 'Morning Stack',
-      subtitle: '750ml + Organika + 5g Creatine + 14g Collagen',
-      primaryStat: `${savedStacks.length} Active`,
-      secondaryStat: '50 kcal • 12.6g PRO • 750ml H2O',
+      title: 'Get Stacked',
+      subtitle: 'Morning • Afternoon • Evening Stacks',
+      primaryStat: `${savedStacks.length} Stacks`,
+      secondaryStat: '750ml + Organika + Creatine + Collagen',
       bgImage: TILE_BACKGROUNDS.stacks,
       icon: Layers,
       accent: 'from-amber-500/85 to-slate-950/95',
       chart: (
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-end gap-1 h-8">
-            <div className="w-2 bg-sky-300 rounded-t h-8" title="750ml Water" />
-            <div className="w-2 bg-amber-300 rounded-t h-6" title="Organika Electrolytes" />
-            <div className="w-2 bg-emerald-300 rounded-t h-5" title="5g Creatine" />
-            <div className="w-2 bg-cyan-300 rounded-t h-7" title="14g Bovine Collagen" />
+            <div className="w-2 bg-sky-300 rounded-t h-8" title="Morning Stacks" />
+            <div className="w-2 bg-amber-300 rounded-t h-6" title="Afternoon Stacks" />
+            <div className="w-2 bg-emerald-300 rounded-t h-5" title="Evening Stacks" />
           </div>
-          <span className="text-[9px] font-black text-amber-200 uppercase">Top-Left Stack</span>
+          <span className="text-[9px] font-black text-amber-200 uppercase">Get Stacked</span>
         </div>
       ),
     },
@@ -1102,7 +1383,7 @@ function DashboardContent() {
       title: 'Nutrition',
       subtitle: `${dailyNutrition.protein}g / ${dailyNutrition.targetProtein}g PRO • ${dailyNutrition.netCarbs || 0}g Net C`,
       primaryStat: `${dailyNutrition.calories} kcal`,
-      secondaryStat: `Budget: ${dailyNutrition.targetCalories} kcal • Fiber: ${dailyNutrition.fiber || 0}g`,
+      secondaryStat: `Max: ${dailyNutrition.targetCalories} kcal • Fiber: ${dailyNutrition.fiber || 0}g`,
       bgImage: TILE_BACKGROUNDS.nutrition,
       icon: Utensils,
       accent: 'from-emerald-600/80 to-slate-950/95',
@@ -1145,7 +1426,7 @@ function DashboardContent() {
       title: 'Peptides & NHL Guard',
       subtitle: `${latestPeptide.peptideName.split(' ')[0]} ${latestPeptide.desiredDoseValue}${latestPeptide.desiredDoseUnit}`,
       primaryStat: `${latestPeptide.syringeUnits} Units`,
-      secondaryStat: `Site: ${latestPeptide.site?.split(' (')[0] || 'Abdomen'}`,
+      secondaryStat: `Site: ${latestPeptide.site || 'Lower Left Abdomen'}`,
       bgImage: TILE_BACKGROUNDS.peptides,
       icon: Syringe,
       accent: 'from-violet-600/80 to-slate-950/95',
@@ -1154,7 +1435,7 @@ function DashboardContent() {
     {
       id: 'activity',
       title: 'Athletic Training',
-      subtitle: 'Spin HR Zones • Ab Wheel • Bands (lbs)',
+      subtitle: 'Spin HR • Bands • Free Weights • Core',
       primaryStat: `${dailyActivity.caloriesBurned} kcal`,
       secondaryStat: `${dailyActivity.trainingLogs?.length || 0} Sessions • Zone 2 Fat Burn`,
       bgImage: TILE_BACKGROUNDS.activity,
@@ -1174,10 +1455,10 @@ function DashboardContent() {
 
   return (
     <div className="h-[100dvh] w-full bg-slate-950 text-white flex flex-col overflow-hidden select-none">
-      {/* Persistent Top Header with Sync Status, Athlete Avatar, Compact Hydration & Linear mTOR Spectrum */}
+      {/* Persistent Top Header with Sync Status, Athlete Avatar, Editable Hydration & Linear mTOR Spectrum */}
       <Header onOpenProfile={() => setActiveTileModal('profile')} />
 
-      {/* Main 2x2 Tile Grid (Fits comfortably on Pixel 8 without scrolling) */}
+      {/* Main 2x2 Tile Grid */}
       <main className="flex-1 max-w-md w-full mx-auto p-2.5 grid grid-cols-2 grid-rows-2 gap-2.5 overflow-hidden">
         {tiles.map((tile) => {
           const IconComponent = tile.icon;
@@ -1241,7 +1522,7 @@ function DashboardContent() {
         })}
       </main>
 
-      {/* Modals for Each Tile */}
+      {/* Modals for Each Tile (Maintaining Active Dark-Glass Theme & Tile Background Image) */}
       {activeTileModal === 'stacks' && (
         <StackManager
           isOpen={true}
@@ -1258,31 +1539,38 @@ function DashboardContent() {
       )}
 
       {activeTileModal === 'peptides' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-hidden flex flex-col">
-            <div className="px-4 py-3.5 bg-[#F4F8FB] border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-2xl bg-violet-600 text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-3 overflow-y-auto">
+          <div className="relative bg-slate-950 border border-white/15 rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-hidden flex flex-col text-white">
+            <img
+              src={TILE_BACKGROUNDS.peptides}
+              alt="Peptides Backdrop"
+              className="absolute inset-0 w-full h-full object-cover object-center opacity-25 pointer-events-none"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/92 to-slate-950/95 pointer-events-none" />
+
+            <div className="relative z-10 px-4 py-3.5 bg-slate-900/90 border-b border-white/15 flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-2 rounded-2xl bg-violet-500/20 border border-violet-400/40 text-violet-300 shrink-0">
                   <Syringe className="w-4 h-4" />
                 </div>
-                <div>
-                  <h2 className="text-sm font-black text-slate-900">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-black text-white truncate">
                     Peptide Injection &amp; Clinical Remission Protocol
                   </h2>
-                  <p className="text-[11px] text-slate-500">
-                    Auto BAC Water Calculator • NHL Remission Guardrail • Full CRUD
+                  <p className="text-[11px] text-slate-400 truncate">
+                    0.3 / 0.5 / 1.0 ml Syringe • Granular Sites • NHL Remission Guardrail
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveTileModal(null)}
-                className="p-1.5 rounded-full hover:bg-slate-200 text-slate-500"
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 overflow-y-auto">
+            <div className="relative z-10 p-4 overflow-y-auto">
               <PeptideCalculator isOpen={true} />
             </div>
           </div>
@@ -1299,7 +1587,7 @@ function DashboardContent() {
         onClose={() => setActiveTileModal(null)}
       />
 
-      {/* Embedded UPC Barcode Camera Scanner Modal */}
+      {/* Embedded UPC Barcode Camera Scanner Modal (Renders at z-[70] above active tile modal) */}
       <BarcodeScannerModal />
     </div>
   );

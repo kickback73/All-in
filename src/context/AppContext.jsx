@@ -88,7 +88,8 @@ const INITIAL_PEPTIDE_HISTORY = [
     desiredDoseUnit: 'mg',
     volumeMl: '0.600',
     syringeUnits: '60.0',
-    site: 'Abdomen (Periumbilical, left/right)',
+    syringeCapacityMl: 1.0,
+    site: 'Lower Left Abdomen',
     dateTime: new Date().toISOString().slice(0, 16),
     timestamp: new Date().toLocaleString([], {
       month: 'short',

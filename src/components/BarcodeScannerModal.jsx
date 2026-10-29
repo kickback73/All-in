@@ -6,13 +6,13 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCw,
-  Barcode,
   Sparkles,
   Search,
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useAppContext } from '../context/AppContext';
-import { lookupUpcBarcode, VERIFIED_UPC_CATALOG } from '../utils/nutrientEngine';
+import { lookupUpcBarcode } from '../utils/nutrientEngine';
+import { TILE_BACKGROUNDS } from '../utils/backgroundEngine';
 
 export default function BarcodeScannerModal() {
   const { isScannerOpen, setIsScannerOpen, logStackToDaily } = useAppContext();
@@ -61,7 +61,7 @@ export default function BarcodeScannerModal() {
       } catch {
         if (isMounted) {
           setScannerError(
-            'Camera stream unavailable or permission denied. Use the UPC input or Quick-Scan presets below.'
+            'Camera stream unavailable in this view. Enter a UPC/EAN code below to lookup.'
           );
         }
       }
@@ -111,11 +111,13 @@ export default function BarcodeScannerModal() {
     setLoggedSuccess(true);
     setTimeout(() => {
       setLoggedSuccess(false);
-      handleClose();
-    }, 900);
+      handleCloseScannerOnly();
+    }, 800);
   };
 
-  const handleClose = () => {
+  // Closes ONLY the camera scanner modal overlay without closing or resetting the Nutrition tile
+  const handleCloseScannerOnly = (e) => {
+    if (e) e.stopPropagation();
     stopCameraScanner();
     setScannedProduct(null);
     setManualUpc('');
@@ -126,10 +128,23 @@ export default function BarcodeScannerModal() {
   if (!isScannerOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-3 overflow-y-auto">
-      <div className="bg-slate-900 border border-white/15 rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden text-white">
+    <div
+      onClick={handleCloseScannerOnly}
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-3 overflow-y-auto"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative bg-slate-950 border border-white/15 rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden text-white"
+      >
+        <img
+          src={TILE_BACKGROUNDS.nutrition}
+          alt="Scanner Backdrop"
+          className="absolute inset-0 w-full h-full object-cover object-center opacity-20 pointer-events-none"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 to-slate-950/95 pointer-events-none" />
+
         {/* Header */}
-        <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between bg-slate-950">
+        <div className="relative z-10 px-4 py-3 border-b border-white/15 flex items-center justify-between bg-slate-900/90">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
               <Camera className="w-4 h-4" />
@@ -139,25 +154,25 @@ export default function BarcodeScannerModal() {
                 UPC / EAN Barcode Camera Scanner
               </h3>
               <p className="text-[10px] text-slate-400">
-                Open Food Facts API v2 + Verified Clinical Fallback
+                Open Food Facts API v2 • Returns directly to Nutrition
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={handleClose}
-            className="p-1.5 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white"
+            onClick={handleCloseScannerOnly}
+            title="Close Camera Scanner (Stay in Nutrition)"
+            className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-4 overflow-y-auto space-y-3">
+        <div className="relative z-10 p-4 overflow-y-auto space-y-3">
           {/* Camera Viewfinder with Target Reticle */}
           <div className="relative rounded-2xl overflow-hidden bg-slate-950 border border-white/15 min-h-[175px] flex items-center justify-center">
             <div id={scannerContainerId} className="w-full h-full" />
 
-            {/* Target Reticle Overlay */}
             <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
               <div className="w-56 h-28 border-2 border-emerald-400/85 rounded-2xl relative shadow-[0_0_25px_rgba(16,185,129,0.25)]">
                 <div className="absolute -top-1 -left-1 w-4 h-4 border-t-4 border-l-4 border-emerald-300 rounded-tl-md" />
@@ -193,7 +208,7 @@ export default function BarcodeScannerModal() {
             <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
               Enter or Scan UPC / EAN Code
             </label>
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap sm:flex-nowrap gap-1.5 w-full">
               <input
                 type="text"
                 value={manualUpc}
@@ -204,8 +219,8 @@ export default function BarcodeScannerModal() {
                     handleResolveBarcode(manualUpc);
                   }
                 }}
-                placeholder="e.g. 068100084245 (Oikos) or any product UPC..."
-                className="flex-1 rounded-xl bg-slate-950 border border-white/15 px-3 py-2 text-xs font-bold text-white"
+                placeholder="Scan with camera or type UPC barcode..."
+                className="min-w-0 flex-1 rounded-xl bg-slate-900 border border-white/15 px-3 py-2 text-xs font-bold text-white"
               />
               <button
                 type="button"
@@ -213,28 +228,8 @@ export default function BarcodeScannerModal() {
                 className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black flex items-center gap-1 shrink-0"
               >
                 <Search className="w-3.5 h-3.5" />
-                <span>Lookup UPC</span>
+                <span>Enter / Lookup</span>
               </button>
-            </div>
-          </div>
-
-          {/* Quick-Scan Verified Staple Barcodes */}
-          <div className="space-y-1">
-            <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block">
-              Quick-Scan Verified Staple UPCs:
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {Object.entries(VERIFIED_UPC_CATALOG).map(([upc, info]) => (
-                <button
-                  key={upc}
-                  type="button"
-                  onClick={() => handleResolveBarcode(upc)}
-                  className="px-2 py-1 rounded-lg bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/40 text-[10px] font-bold text-slate-300 hover:text-emerald-200 transition flex items-center gap-1"
-                >
-                  <Barcode className="w-3 h-3 text-emerald-400" />
-                  <span>{info.name.split(' ')[0]}</span>
-                </button>
-              ))}
             </div>
           </div>
 

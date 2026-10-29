@@ -14,14 +14,25 @@ import {
 import { ESSENTIAL_AMINO_ACIDS, MICRONUTRIENT_FIELDS } from '../data/initialData';
 import {
   lookupVerifiedNutrients,
+  parseQuantityGrams,
   scaleNutrients,
-  VERIFIED_NUTRIENT_DATABASE,
 } from '../utils/nutrientEngine';
+import { TILE_BACKGROUNDS } from '../utils/backgroundEngine';
+
+export const STACK_CATEGORIES = [
+  'Morning Stacks',
+  'Afternoon Stacks',
+  'Evening Stacks',
+];
+
+let ingredientSeq = 1;
+const generateUniqueIngId = () =>
+  `ing_${Date.now()}_${ingredientSeq++}_${Math.random().toString(36).slice(2, 7)}`;
 
 const createEmptyIngredient = () => ({
-  id: `ing_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+  id: generateUniqueIngId(),
   name: '',
-  servingGrams: 100,
+  servingGrams: '100g',
   source: '',
   per100g: null,
   calories: 0,
@@ -103,11 +114,13 @@ export default function StackManager({
   onLogStack,
   onClose,
 }) {
+  const [selectedCategory, setSelectedCategory] = useState('Morning Stacks');
   const [editingStackId, setEditingStackId] = useState(null);
   const [stackName, setStackName] = useState('');
+  const [stackCategory, setStackCategory] = useState('Morning Stacks');
   const [scheduledHour, setScheduledHour] = useState('07:30');
   const [isRecurringPlanned, setIsRecurringPlanned] = useState(true);
-  const [ingredients, setIngredients] = useState([createEmptyIngredient()]);
+  const [ingredients, setIngredients] = useState(() => [createEmptyIngredient()]);
   const [loadingIngId, setLoadingIngId] = useState(null);
   const [saveSuccessBanner, setSaveSuccessBanner] = useState(false);
 
@@ -115,62 +128,73 @@ export default function StackManager({
   const leucineGrams = (liveTotals.aminos.leucine / 1000).toFixed(2);
   const methionineGrams = (liveTotals.aminos.methionine / 1000).toFixed(2);
 
+  const categorizedStacks = useMemo(() => {
+    const groups = {
+      'Morning Stacks': [],
+      'Afternoon Stacks': [],
+      'Evening Stacks': [],
+    };
+    stacks.forEach((s) => {
+      const cat = STACK_CATEGORIES.includes(s.category) ? s.category : 'Morning Stacks';
+      groups[cat].push(s);
+    });
+    return groups;
+  }, [stacks]);
+
   if (!isOpen) return null;
 
   const handleAutoPopulateIngredient = async (ing) => {
     if (!ing.name.trim()) return;
     setLoadingIngId(ing.id);
-    const verified = await lookupVerifiedNutrients(ing.name, null);
+    const verified = await lookupVerifiedNutrients(ing.name, ing.servingGrams);
     setLoadingIngId(null);
 
     if (verified) {
       setIngredients((prev) =>
-        prev.map((item) => (item.id === ing.id ? { ...item, ...verified } : item))
+        prev.map((item) =>
+          item.id === ing.id
+            ? {
+                ...item,
+                ...verified,
+                id: ing.id, // Strictly preserve unique ID
+                servingGrams: verified.servingInputText || `${verified.servingGrams}g`,
+              }
+            : item
+        )
       );
     }
   };
 
-  const handleQuickPresetSelect = (id, dbIndex) => {
-    if (dbIndex === '') return;
-    const entry = VERIFIED_NUTRIENT_DATABASE[Number(dbIndex)];
-    if (!entry) return;
-    const scaled = scaleNutrients(entry.per100g, entry.defaultServingGrams);
-    setIngredients((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              name: entry.label.split(' (')[0],
-              source: entry.label,
-              servingGrams: entry.defaultServingGrams,
-              per100g: entry.per100g,
-              ...scaled,
-            }
-          : item
-      )
-    );
-  };
-
-  const handleServingGramsChange = (id, newGrams) => {
+  const handleServingTextChange = (targetId, newServingText) => {
     setIngredients((prev) =>
       prev.map((ing) => {
-        if (ing.id !== id) return ing;
+        if (ing.id !== targetId) return ing;
         if (ing.per100g) {
+          const parsedGrams = parseQuantityGrams(`${newServingText} ${ing.name}`, 100);
           return {
             ...ing,
-            servingGrams: newGrams,
-            ...scaleNutrients(ing.per100g, Number(newGrams) || 0),
+            servingGrams: newServingText,
+            ...scaleNutrients(ing.per100g, parsedGrams),
+            id: ing.id,
           };
         }
-        return { ...ing, servingGrams: newGrams };
+        return { ...ing, servingGrams: newServingText };
       })
     );
   };
 
-  const handleIngredientChange = (id, field, value, nestedGroup = null) => {
+  // Strictly remove ONLY the targeted item by unique ID (fixes the last-two-items deletion bug)
+  const handleRemoveIngredient = (targetId) => {
+    setIngredients((prev) => {
+      const filtered = prev.filter((item) => item.id !== targetId);
+      return filtered.length > 0 ? filtered : [createEmptyIngredient()];
+    });
+  };
+
+  const handleIngredientChange = (targetId, field, value, nestedGroup = null) => {
     setIngredients((prev) =>
       prev.map((ing) => {
-        if (ing.id !== id) return ing;
+        if (ing.id !== targetId) return ing;
         if (nestedGroup) {
           return {
             ...ing,
@@ -195,13 +219,22 @@ export default function StackManager({
   };
 
   const handleEditExistingStack = (stack) => {
+    const cat = STACK_CATEGORIES.includes(stack.category) ? stack.category : 'Morning Stacks';
     setEditingStackId(stack.id);
     setStackName(stack.name);
+    setStackCategory(cat);
+    setSelectedCategory(cat);
     setScheduledHour(stack.scheduledHour || '07:30');
     setIsRecurringPlanned(stack.isRecurringPlanned !== false);
+    // Assign guaranteed unique IDs per ingredient row so deleting any row only deletes that exact row
     setIngredients(
       Array.isArray(stack.ingredients) && stack.ingredients.length > 0
-        ? stack.ingredients.map((i) => ({ ...createEmptyIngredient(), ...i }))
+        ? stack.ingredients.map((i) => ({
+            ...createEmptyIngredient(),
+            ...i,
+            id: generateUniqueIngId(),
+            servingGrams: String(i.servingGrams ?? '100g'),
+          }))
         : [createEmptyIngredient()]
     );
   };
@@ -217,6 +250,7 @@ export default function StackManager({
     const savedStack = {
       id: editingStackId || `stack_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       name: stackName.trim(),
+      category: stackCategory,
       scheduledHour,
       isRecurringPlanned,
       ingredients: validIngredients,
@@ -228,6 +262,7 @@ export default function StackManager({
       onSaveStack(savedStack);
     }
 
+    setSelectedCategory(stackCategory);
     setSaveSuccessBanner(true);
     setEditingStackId(null);
     setStackName('');
@@ -236,20 +271,28 @@ export default function StackManager({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-3 overflow-y-auto">
+      <div className="relative rounded-3xl shadow-2xl border border-white/15 w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden text-white bg-slate-950">
+        {/* Consistent Tile Background Image + Dark Glass Backdrop */}
+        <img
+          src={TILE_BACKGROUNDS.stacks}
+          alt="Get Stacked Backdrop"
+          className="absolute inset-0 w-full h-full object-cover object-center opacity-25 pointer-events-none"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/92 to-slate-950/95 pointer-events-none" />
+
         {/* Top Header */}
-        <div className="px-4 py-3.5 bg-[#F4F8FB] border-b border-slate-200/70 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-2xl bg-sky-600 text-white shadow-xs">
+        <div className="relative z-10 px-4 py-3.5 bg-slate-900/90 border-b border-white/15 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-2 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-300 shrink-0">
               <Layers className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-sm font-black text-slate-900">
-                {editingStackId ? 'Edit Stack' : 'Morning Stack & Protocol Builder'}
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-white truncate">
+                {editingStackId ? 'Edit Stack — Get Stacked' : 'Get Stacked — Multi-Stack Builder'}
               </h2>
-              <p className="text-[11px] text-slate-500">
-                USDA FoodData Central & Verified Baseline Dictionary
+              <p className="text-[11px] text-slate-400 truncate">
+                Morning, Afternoon &amp; Evening Stacks • Auto-Verified Nutrients
               </p>
             </div>
           </div>
@@ -257,36 +300,66 @@ export default function StackManager({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-full hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition"
+              className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
           )}
         </div>
 
-        <div className="p-4 overflow-y-auto space-y-4">
+        <div className="relative z-10 p-4 overflow-y-auto space-y-4">
           {saveSuccessBanner && (
-            <div className="rounded-xl bg-emerald-50 border border-emerald-300 p-2.5 flex items-center gap-2 text-emerald-900 text-xs font-bold">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Stack saved with verified nutrient totals!</span>
+            <div className="rounded-xl bg-emerald-500/20 border border-emerald-400/40 p-2.5 flex items-center gap-2 text-emerald-200 text-xs font-bold">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Stack saved to {selectedCategory}!</span>
             </div>
           )}
 
-          {/* Saved Stacks List */}
-          {stacks.length > 0 && (
+          {/* Category Filter Tabs (Morning Stacks / Afternoon Stacks / Evening Stacks) */}
+          <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-1.5 bg-slate-900/90 p-1 rounded-2xl border border-white/10">
+              {STACK_CATEGORIES.map((cat) => {
+                const count = categorizedStacks[cat]?.length || 0;
+                const isSelected = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory(cat);
+                      if (!editingStackId) setStackCategory(cat);
+                    }}
+                    className={`py-1.5 px-2 rounded-xl text-[10px] font-black transition truncate ${
+                      isSelected
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {cat.replace(' Stacks', '')} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Active Category Stacks List */}
             <div className="space-y-2">
-              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
-                Active Stacks ({stacks.length}) — Tap to Log or Edit
+              <div className="text-[10px] font-extrabold uppercase tracking-wider text-amber-300">
+                {selectedCategory} ({categorizedStacks[selectedCategory]?.length || 0})
               </div>
-              <div className="space-y-2">
-                {stacks.map((s) => (
+
+              {(categorizedStacks[selectedCategory] || []).length === 0 ? (
+                <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-3 text-center text-xs text-slate-400">
+                  No stacks saved in {selectedCategory} yet. Build one below!
+                </div>
+              ) : (
+                (categorizedStacks[selectedCategory] || []).map((s) => (
                   <div
                     key={s.id}
-                    className="rounded-2xl border border-slate-200 p-3 bg-[#F4F8FB] flex items-center justify-between gap-2"
+                    className="rounded-2xl border border-white/15 p-3 bg-slate-900/80 flex items-center justify-between gap-2"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="font-extrabold text-slate-900 text-xs truncate">{s.name}</div>
-                      <div className="text-[11px] font-semibold text-slate-600">
+                      <div className="font-extrabold text-white text-xs truncate">{s.name}</div>
+                      <div className="text-[11px] font-semibold text-slate-300">
                         {s.totals?.calories || 0} kcal • {s.totals?.protein || 0}g P •{' '}
                         {s.totals?.netCarbs ?? s.totals?.carbs ?? 0}g Net C •{' '}
                         {s.totals?.waterMl || 0}ml H2O
@@ -297,7 +370,7 @@ export default function StackManager({
                         <button
                           type="button"
                           onClick={() => onLogStack(s)}
-                          className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-sky-600 text-white hover:bg-sky-700"
+                          className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-500 text-slate-950 hover:bg-amber-400"
                         >
                           Log
                         </button>
@@ -305,7 +378,7 @@ export default function StackManager({
                       <button
                         type="button"
                         onClick={() => handleEditExistingStack(s)}
-                        className="p-1.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-sky-700"
+                        className="p-1.5 rounded-full bg-white/10 border border-white/15 text-slate-200 hover:text-amber-300"
                         title="Edit Stack"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
@@ -314,7 +387,7 @@ export default function StackManager({
                         <button
                           type="button"
                           onClick={() => onDeleteStack(s.id)}
-                          className="p-1.5 rounded-full bg-white border border-slate-200 text-rose-600 hover:bg-rose-50"
+                          className="p-1.5 rounded-full bg-white/10 border border-white/15 text-rose-400 hover:bg-rose-500/20"
                           title="Delete Stack"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -322,55 +395,71 @@ export default function StackManager({
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
+                ))
+              )}
             </div>
-          )}
+          </div>
 
           {/* Live Combined Stack Totals */}
-          <div className="rounded-2xl bg-[#F4F8FB] border border-sky-200 p-3 space-y-2">
+          <div className="rounded-2xl bg-slate-900/90 border border-amber-500/30 p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold uppercase text-sky-800 flex items-center gap-1">
+              <span className="text-[11px] font-extrabold uppercase text-amber-300 flex items-center gap-1">
                 <Sparkles className="w-3.5 h-3.5" />
-                Live Auto-Calculated Stack Totals
+                Live Stack Totals
               </span>
-              <span className="text-[10px] font-bold text-slate-600">
+              <span className="text-[10px] font-bold text-slate-300">
                 Leu: {leucineGrams}g • Met: {methionineGrams}g
               </span>
             </div>
             <div className="grid grid-cols-6 gap-1 text-center">
-              <div className="bg-white rounded-xl p-1.5 border border-slate-200/80">
-                <div className="text-[8px] text-slate-500 font-bold">Kcal</div>
-                <div className="text-xs font-black text-slate-900">{liveTotals.calories}</div>
+              <div className="bg-slate-950/90 rounded-xl p-1.5 border border-white/10">
+                <div className="text-[8px] text-slate-400 font-bold">Kcal</div>
+                <div className="text-xs font-black text-white">{liveTotals.calories}</div>
               </div>
-              <div className="bg-white rounded-xl p-1.5 border border-slate-200/80">
-                <div className="text-[8px] text-slate-500 font-bold">Protein</div>
-                <div className="text-xs font-black text-sky-700">{liveTotals.protein}g</div>
+              <div className="bg-slate-950/90 rounded-xl p-1.5 border border-white/10">
+                <div className="text-[8px] text-slate-400 font-bold">Protein</div>
+                <div className="text-xs font-black text-emerald-400">{liveTotals.protein}g</div>
               </div>
-              <div className="bg-white rounded-xl p-1.5 border border-slate-200/80">
-                <div className="text-[8px] text-slate-500 font-bold">Carbs</div>
-                <div className="text-xs font-black text-teal-700">{liveTotals.carbs}g</div>
+              <div className="bg-slate-950/90 rounded-xl p-1.5 border border-white/10">
+                <div className="text-[8px] text-slate-400 font-bold">Carbs</div>
+                <div className="text-xs font-black text-cyan-300">{liveTotals.carbs}g</div>
               </div>
-              <div className="bg-white rounded-xl p-1.5 border border-slate-200/80">
-                <div className="text-[8px] text-slate-500 font-bold">Net Carb</div>
-                <div className="text-xs font-black text-emerald-700">{liveTotals.netCarbs}g</div>
+              <div className="bg-slate-950/90 rounded-xl p-1.5 border border-white/10">
+                <div className="text-[8px] text-slate-400 font-bold">Net Carb</div>
+                <div className="text-xs font-black text-teal-300">{liveTotals.netCarbs}g</div>
               </div>
-              <div className="bg-white rounded-xl p-1.5 border border-slate-200/80">
-                <div className="text-[8px] text-slate-500 font-bold">Fats</div>
-                <div className="text-xs font-black text-indigo-700">{liveTotals.fats}g</div>
+              <div className="bg-slate-950/90 rounded-xl p-1.5 border border-white/10">
+                <div className="text-[8px] text-slate-400 font-bold">Fats</div>
+                <div className="text-xs font-black text-amber-300">{liveTotals.fats}g</div>
               </div>
-              <div className="bg-white rounded-xl p-1.5 border border-slate-200/80">
-                <div className="text-[8px] text-slate-500 font-bold">Water</div>
-                <div className="text-xs font-black text-cyan-700">{liveTotals.waterMl}ml</div>
+              <div className="bg-slate-950/90 rounded-xl p-1.5 border border-white/10">
+                <div className="text-[8px] text-slate-400 font-bold">Water</div>
+                <div className="text-xs font-black text-sky-300">{liveTotals.waterMl}ml</div>
               </div>
             </div>
           </div>
 
           {/* Stack Builder Form */}
           <form onSubmit={handleCreateOrSaveStack} className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-2">
-                <label className="block text-[10px] font-extrabold text-slate-700 uppercase mb-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+                  Stack Category
+                </label>
+                <select
+                  value={stackCategory}
+                  onChange={(e) => setStackCategory(e.target.value)}
+                  className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-white"
+                >
+                  {STACK_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat} className="bg-slate-900 text-white">
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
                   Stack Name
                 </label>
                 <input
@@ -378,19 +467,19 @@ export default function StackManager({
                   required
                   value={stackName}
                   onChange={(e) => setStackName(e.target.value)}
-                  placeholder="e.g., Dan's Morning Stack"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-900"
+                  placeholder="e.g., Afternoon Recovery Stack"
+                  className="w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-1.5 text-xs font-bold text-white"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-extrabold text-slate-700 uppercase mb-1">
-                  Time
+                <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+                  Scheduled Time
                 </label>
                 <input
                   type="time"
                   value={scheduledHour}
                   onChange={(e) => setScheduledHour(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-900"
+                  className="w-full rounded-xl border border-white/15 bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-white"
                 />
               </div>
             </div>
@@ -400,39 +489,25 @@ export default function StackManager({
               {ingredients.map((ing, idx) => (
                 <div
                   key={ing.id}
-                  className="rounded-2xl border border-slate-200 p-3 bg-slate-50/80 space-y-2.5"
+                  className="rounded-2xl border border-white/15 p-3 bg-slate-900/85 space-y-2.5 overflow-hidden"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-black uppercase text-slate-700">
-                      Item #{idx + 1}
+                    <span className="text-[11px] font-black uppercase text-amber-300">
+                      Ingredient #{idx + 1}
                     </span>
-                    <select
-                      defaultValue=""
-                      onChange={(e) => handleQuickPresetSelect(ing.id, e.target.value)}
-                      className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-800"
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveIngredient(ing.id)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 text-[10px] font-bold transition"
+                      title="Delete strictly this ingredient"
                     >
-                      <option value="">⚡ Quick Select Verified Staple...</option>
-                      {VERIFIED_NUTRIENT_DATABASE.map((dbItem, dbIdx) => (
-                        <option key={dbIdx} value={dbIdx}>
-                          {dbItem.label.split(' (')[0]} ({dbItem.defaultServingGrams}g/ml)
-                        </option>
-                      ))}
-                    </select>
-                    {ingredients.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setIngredients((prev) => prev.filter((item) => item.id !== ing.id))
-                        }
-                        className="text-rose-600 hover:text-rose-800 p-1"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                      <Trash2 className="w-3 h-3" />
+                      <span>Remove</span>
+                    </button>
                   </div>
 
-                  {/* Ingredient Search / Enter / Lookup Row */}
-                  <div className="flex gap-1.5">
+                  {/* Contained Ingredient Search + Flexible Serving Input + Enter / Lookup Button */}
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 w-full">
                     <input
                       type="text"
                       required
@@ -449,85 +524,91 @@ export default function StackManager({
                           handleAutoPopulateIngredient(ing);
                         }
                       }}
-                      placeholder="Type food (e.g. Banana, Oats, White Fish, Eggs) & press Enter..."
-                      className="flex-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-900"
+                      placeholder="Food/supplement (e.g. Black Coffee, Collagen, Oats)..."
+                      className="min-w-0 flex-1 rounded-xl border border-white/15 bg-slate-950 px-2.5 py-1.5 text-xs font-bold text-white"
+                    />
+                    <input
+                      type="text"
+                      value={ing.servingGrams}
+                      onChange={(e) => handleServingTextChange(ing.id, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAutoPopulateIngredient(ing);
+                        }
+                      }}
+                      placeholder="e.g. 3/4 cup, 2 tbsp"
+                      className="w-28 shrink-0 rounded-xl border border-amber-400/40 bg-slate-950 px-2 py-1.5 text-xs font-bold text-amber-200"
                     />
                     <button
                       type="button"
                       onClick={() => handleAutoPopulateIngredient(ing)}
                       disabled={loadingIngId === ing.id}
-                      className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-extrabold flex items-center gap-1 shrink-0 cursor-pointer"
-                      title="Lookup and auto-populate verified USDA / OpenFoodFacts nutrients"
+                      className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-black flex items-center justify-center gap-1 shrink-0 cursor-pointer max-w-full"
+                      title="Lookup and auto-populate verified USDA nutrients"
                     >
-                      <Search className="w-3 h-3" />
-                      <span>{loadingIngId === ing.id ? '...' : 'Enter / Lookup'}</span>
+                      <Search className="w-3 h-3 shrink-0" />
+                      <span className=" whitespace-nowrap">
+                        {loadingIngId === ing.id ? '...' : 'Enter / Lookup'}
+                      </span>
                     </button>
                   </div>
 
                   {ing.source && (
-                    <div className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                    <div className="text-[10px] font-bold text-emerald-300 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-md truncate">
                       ✓ {ing.source}
                     </div>
                   )}
 
-                  {/* Editable Grams/ml + Macros (including Total Carbs, Fiber, Net Carbs, Fats) */}
-                  <div className="grid grid-cols-6 gap-1.5">
+                  {/* Editable Macros Grid */}
+                  <div className="grid grid-cols-5 gap-1.5">
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-500">Amt (g/ml)</label>
-                      <input
-                        type="number"
-                        value={ing.servingGrams}
-                        onChange={(e) => handleServingGramsChange(ing.id, e.target.value)}
-                        className="w-full rounded-lg border border-sky-300 bg-white px-1.5 py-1 text-xs font-black text-sky-900"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] font-bold text-slate-500">Kcal</label>
+                      <label className="block text-[9px] font-bold text-slate-400">Kcal</label>
                       <input
                         type="number"
                         value={ing.calories}
                         onChange={(e) => handleIngredientChange(ing.id, 'calories', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs font-bold"
+                        className="w-full rounded-lg border border-white/15 bg-slate-950 px-1.5 py-1 text-xs font-bold text-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-500">Prot (g)</label>
+                      <label className="block text-[9px] font-bold text-slate-400">Prot (g)</label>
                       <input
                         type="number"
                         step="0.1"
                         value={ing.protein}
                         onChange={(e) => handleIngredientChange(ing.id, 'protein', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs font-bold"
+                        className="w-full rounded-lg border border-white/15 bg-slate-950 px-1.5 py-1 text-xs font-bold text-emerald-300"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-500">Carb (g)</label>
+                      <label className="block text-[9px] font-bold text-slate-400">Carb (g)</label>
                       <input
                         type="number"
                         step="0.1"
                         value={ing.carbs}
                         onChange={(e) => handleIngredientChange(ing.id, 'carbs', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs font-bold"
+                        className="w-full rounded-lg border border-white/15 bg-slate-950 px-1.5 py-1 text-xs font-bold text-cyan-300"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-500">Net C (g)</label>
+                      <label className="block text-[9px] font-bold text-slate-400">Net C (g)</label>
                       <input
                         type="number"
                         step="0.1"
                         value={ing.netCarbs ?? Math.max(0, (Number(ing.carbs) || 0) - (Number(ing.fiber) || 0))}
                         readOnly
-                        className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-1.5 py-1 text-xs font-black text-emerald-800"
+                        className="w-full rounded-lg border border-teal-500/30 bg-teal-950/40 px-1.5 py-1 text-xs font-black text-teal-300"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-500">Fat (g)</label>
+                      <label className="block text-[9px] font-bold text-slate-400">Fat (g)</label>
                       <input
                         type="number"
                         step="0.1"
                         value={ing.fats}
                         onChange={(e) => handleIngredientChange(ing.id, 'fats', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs font-bold"
+                        className="w-full rounded-lg border border-white/15 bg-slate-950 px-1.5 py-1 text-xs font-bold text-amber-300"
                       />
                     </div>
                   </div>
@@ -539,17 +620,17 @@ export default function StackManager({
               <button
                 type="button"
                 onClick={() => setIngredients((prev) => [...prev, createEmptyIngredient()])}
-                className="px-3.5 py-2 rounded-full text-xs font-extrabold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition flex items-center gap-1"
+                className="px-3.5 py-2 rounded-full text-xs font-extrabold text-amber-300 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/30 transition flex items-center gap-1"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Ingredient</span>
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-full text-xs font-extrabold text-white bg-sky-600 hover:bg-sky-700 shadow-sm transition flex items-center gap-1.5"
+                className="px-5 py-2 rounded-full text-xs font-extrabold text-slate-950 bg-amber-500 hover:bg-amber-400 shadow-sm transition flex items-center gap-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>{editingStackId ? 'Update Stack' : 'Save Stack'}</span>
+                <span>{editingStackId ? 'Update Stack' : `Save to ${stackCategory}`}</span>
               </button>
             </div>
           </form>
