@@ -13,6 +13,10 @@ import {
   HeartPulse,
   Trash2,
   Calendar,
+  Edit2,
+  Save,
+  Sparkles,
+  Flame,
 } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import Header from './components/Header';
@@ -25,7 +29,7 @@ import { TILE_BACKGROUNDS } from './utils/backgroundEngine';
 import { lookupVerifiedNutrients } from './utils/nutrientEngine';
 
 /**
- * SVG Macro Ring / Doughnut Chart (Protein, Fats, Carbs breakdown) + Caloric Progress
+ * SVG Macro Ring / Doughnut Chart (for the main 2x2 Dashboard Tile preview only)
  */
 const MacroDoughnutChart = ({
   protein = 0,
@@ -125,15 +129,16 @@ const MiniSyringeChart = ({ units = 60 }) => {
 /**
  * Tile 2 Modal: Nutrition Overhaul
  * - Persistent visible background image (`TILE_BACKGROUNDS.nutrition` at `opacity-90`)
- * - Removed bottom "edit daily nutrition & allowance targets" section (moved to Profile Settings)
- * - Replaced with comprehensive Macros, Micros & 9 Essential Amino Acids comparison breakdown chart
+ * - Auto-clears ingredient input field on food commit
+ * - Inline pencil edit (`<Edit2 />`) + delete (`<Trash2 />`) on logged meal rows
  */
 const NutritionDetailModal = ({ onClose }) => {
   const {
     dailyNutrition,
     setDailyNutrition,
     logStackToDaily,
-    setIsScannerOpen,
+    openScannerForDaily,
+    updateMealInDaily,
   } = useAppContext();
 
   const [foodQuery, setFoodQuery] = useState('');
@@ -142,6 +147,16 @@ const NutritionDetailModal = ({ onClose }) => {
   const [stagedFood, setStagedFood] = useState(null);
   const [lastVerifiedSource, setLastVerifiedSource] = useState('');
   const foodInputRef = useRef(null);
+
+  // Inline edit state for logged meals (Item 5)
+  const [editingMealId, setEditingMealId] = useState(null);
+  const [editMealForm, setEditMealForm] = useState({
+    name: '',
+    calories: '',
+    protein: '',
+    carbs: '',
+    fats: '',
+  });
 
   const handleLookupFood = async (e) => {
     if (e) e.preventDefault();
@@ -183,6 +198,30 @@ const NutritionDetailModal = ({ onClose }) => {
       foodInputRef.current.value = '';
       foodInputRef.current.focus();
     }
+  };
+
+  const handleStartEditMeal = (meal) => {
+    setEditingMealId(meal.id);
+    setEditMealForm({
+      name: meal.name || '',
+      calories: String(meal.calories ?? 0),
+      protein: String(meal.protein ?? 0),
+      carbs: String(meal.carbs ?? 0),
+      fats: String(meal.fats ?? 0),
+    });
+  };
+
+  const handleSaveMealEdit = (mealId) => {
+    if (typeof updateMealInDaily === 'function') {
+      updateMealInDaily(mealId, {
+        name: editMealForm.name,
+        calories: Number(editMealForm.calories) || 0,
+        protein: Number(editMealForm.protein) || 0,
+        carbs: Number(editMealForm.carbs) || 0,
+        fats: Number(editMealForm.fats) || 0,
+      });
+    }
+    setEditingMealId(null);
   };
 
   const handleRemoveMealFromDaily = (mealId) => {
@@ -276,7 +315,7 @@ const NutritionDetailModal = ({ onClose }) => {
               <button
                 type="button"
                 onClick={() => {
-                  setIsScannerOpen(true);
+                  openScannerForDaily();
                 }}
                 className="px-2.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] font-black flex items-center gap-1 shadow-xs shrink-0"
               >
@@ -382,34 +421,94 @@ const NutritionDetailModal = ({ onClose }) => {
           {/* Comprehensive Breakdown Chart: Macros, Micros & Detailed 9 Amino Acids vs. Daily Recommended Intake */}
           <PersistentAllowanceChart showDetailedBreakdown={true} />
 
-          {/* Logged Daily Meals List */}
+          {/* Logged Daily Meals List with Inline Pencil Edit & Delete Controls */}
           {(dailyNutrition.meals || []).length > 0 && (
             <div className="rounded-2xl bg-slate-950/65 backdrop-blur-md border border-white/20 p-3 space-y-1.5">
               <div className="text-[10px] font-extrabold uppercase text-slate-200">
                 Today&apos;s Logged Items ({dailyNutrition.meals.length})
               </div>
-              <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                {dailyNutrition.meals.map((meal) => (
-                  <div
-                    key={meal.id}
-                    className="flex items-center justify-between bg-slate-950/85 border border-white/15 rounded-xl px-2.5 py-1.5 text-xs"
-                  >
-                    <div className="min-w-0">
-                      <div className="font-bold text-white truncate">{meal.name}</div>
-                      <div className="text-[10px] text-slate-300">
-                        {meal.calories} kcal • {meal.protein}g P • {meal.carbs}g C • {meal.fats}g F
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMealFromDaily(meal.id)}
-                      className="p-1 text-rose-400 hover:text-rose-300 shrink-0"
-                      title="Remove item and update daily chart"
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                {dailyNutrition.meals.map((meal) => {
+                  const isEditingThis = editingMealId === meal.id;
+                  return (
+                    <div
+                      key={meal.id}
+                      className="bg-slate-950/85 border border-white/15 rounded-xl px-2.5 py-1.5 text-xs space-y-1.5"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <div className="font-bold text-white truncate">{meal.name}</div>
+                          <div className="text-[10px] text-slate-300">
+                            {meal.calories} kcal • {meal.protein}g P • {meal.carbs}g C • {meal.fats}g F
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              isEditingThis ? setEditingMealId(null) : handleStartEditMeal(meal)
+                            }
+                            className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-emerald-300 transition"
+                            title="Edit logged item"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMealFromDaily(meal.id)}
+                            className="p-1 rounded-lg bg-white/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 shrink-0 transition"
+                            title="Remove item and update daily chart"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {isEditingThis && (
+                        <div className="rounded-lg bg-slate-900/90 border border-emerald-400/40 p-2 space-y-1.5">
+                          <div className="grid grid-cols-5 gap-1">
+                            <input
+                              type="text"
+                              value={editMealForm.name}
+                              onChange={(e) =>
+                                setEditMealForm((p) => ({ ...p, name: e.target.value }))
+                              }
+                              placeholder="Name"
+                              className="col-span-2 rounded bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-white"
+                            />
+                            <input
+                              type="number"
+                              value={editMealForm.calories}
+                              onChange={(e) =>
+                                setEditMealForm((p) => ({ ...p, calories: e.target.value }))
+                              }
+                              placeholder="Kcal"
+                              className="rounded bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-white"
+                            />
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={editMealForm.protein}
+                              onChange={(e) =>
+                                setEditMealForm((p) => ({ ...p, protein: e.target.value }))
+                              }
+                              placeholder="Prot"
+                              className="rounded bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-emerald-300"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSaveMealEdit(meal.id)}
+                              className="rounded bg-emerald-500 text-slate-950 text-[10px] font-black flex items-center justify-center gap-0.5"
+                            >
+                              <Save className="w-3 h-3" />
+                              <span>Save</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -420,9 +519,7 @@ const NutritionDetailModal = ({ onClose }) => {
 };
 
 /**
- * Visual Schedule vs. Actual Training Calendar Chart (Section 3)
- * - Completed scheduled workouts show as normal/success (Emerald)
- * - Missed scheduled workouts (past dates scheduled without completion) show highlighted clearly in RED
+ * Visual Schedule vs. Actual Training Calendar Chart
  */
 const TrainingScheduleCalendarChart = () => {
   const { dailyActivity, toggleCalendarDateStatus } = useAppContext();
@@ -449,7 +546,7 @@ const TrainingScheduleCalendarChart = () => {
       const isPast = offset < 0;
       const isToday = key === todayKey;
 
-      let status = 'rest'; // 'completed' | 'missed' | 'scheduled' | 'rest'
+      let status = 'rest';
       if (isCompleted) {
         status = 'completed';
       } else if (isScheduled && isPast) {
@@ -480,12 +577,12 @@ const TrainingScheduleCalendarChart = () => {
           <span>Schedule vs. Actual Training Calendar</span>
         </span>
         <div className="flex items-center gap-2 text-[9px] font-bold">
-          <span className="text-emerald-300">✓ {completedCount} Done</span>
+          <span className="text-emerald-300">✓ {completedCount} Locked In</span>
           <span className="text-rose-400 font-black">● {missedCount} Missed</span>
         </div>
       </div>
 
-      {/* 14-Day 7x2 Visual Matrix (Tap any date to cycle Scheduled / Completed / Rest) */}
+      {/* 14-Day 7x2 Visual Matrix */}
       <div className="grid grid-cols-7 gap-1.5 text-center">
         {daysMatrix.map((d) => {
           let cellClasses =
@@ -531,7 +628,7 @@ const TrainingScheduleCalendarChart = () => {
       </div>
 
       <div className="flex items-center justify-between text-[9px] text-slate-300 pt-0.5">
-        <span>Tap any date to schedule or mark complete</span>
+        <span>Tap any date to schedule or lock in completion</span>
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1 text-emerald-300 font-bold">
             <span className="w-2 h-2 rounded-full bg-emerald-400" /> Done
@@ -549,8 +646,60 @@ const TrainingScheduleCalendarChart = () => {
 };
 
 /**
- * Expanded Exercise Library Catalog
+ * Expanded Exercise Library Catalog (Including 8 kg Medicine Ball Module)
  */
+const MEDICINE_BALL_8KG_MOVEMENTS = [
+  {
+    name: 'Overhead Medicine Ball Slams (8 kg)',
+    target: 'Lats, Core & Explosive Triple Extension',
+    dispMeters: 1.55,
+    metFactor: 8.8,
+    coachCue: 'Drive through the lats and brace your abs hard at the bottom of every slam!',
+  },
+  {
+    name: 'Seated Russian Twists (8 kg)',
+    target: 'Obliques & Rotational Core Control',
+    dispMeters: 0.65,
+    metFactor: 6.4,
+    coachCue: 'Keep your ribs locked down and rotate from the thoracic spine—own every rep!',
+  },
+  {
+    name: 'Medicine Ball Wall Balls (8 kg)',
+    target: 'Quads, Glutes, Shoulders & Conditioning',
+    dispMeters: 2.1,
+    metFactor: 9.2,
+    coachCue: 'Explode out of the squat pocket and transfer hip drive straight into the 8 kg press!',
+  },
+  {
+    name: 'Rotational Woodchoppers (8 kg)',
+    target: 'Transverse Abdominis, Obliques & Rear Delts',
+    dispMeters: 1.35,
+    metFactor: 7.5,
+    coachCue: 'Pivot the back foot cleanly and decelerate the 8 kg ball with pure core tension!',
+  },
+  {
+    name: 'Explosive Chest Passes (8 kg)',
+    target: 'Pectorals, Anterior Delts & Triceps',
+    dispMeters: 1.15,
+    metFactor: 7.2,
+    coachCue: 'Punch violently from the sternum and keep your scapulae stable!',
+  },
+  {
+    name: 'Overhead Medicine Ball Reverse Lunges (8 kg)',
+    target: 'Glutes, Hamstrings & Overhead Core Stability',
+    dispMeters: 1.05,
+    metFactor: 7.8,
+    coachCue: 'Lock the 8 kg ball overhead—zero rib flare, drive hard through your front heel!',
+  },
+  {
+    name: 'Standing Medicine Ball Halo Rotations (8 kg)',
+    target: 'Shoulders, Upper Back & Anti-Rotation Core',
+    dispMeters: 0.75,
+    metFactor: 6.0,
+    coachCue: 'Carve a tight orbit around your head while keeping your hips completely statuesque!',
+  },
+];
+
 const RESISTANCE_BAND_MOVEMENTS = [
   'Band Lat Pulldowns (Back / V-Taper)',
   'Band Seated Rows (Mid-Back Thickness)',
@@ -582,27 +731,85 @@ const CALISTHENIC_MOVEMENTS = [
 ];
 
 /**
- * Tile 4 Modal: Athletic Training & Schedule Calendar Chart
+ * Tile 4 Modal: Athletic Training, 8 kg Medicine Ball Module & Personal Coach Telemetry
  */
 const AthleticTrainingModal = ({ onClose }) => {
   const {
     userProfile,
     dailyActivity,
     addTrainingSession,
+    updateTrainingSession,
     deleteTrainingSession,
   } = useAppContext();
 
-  const [activeSubTab, setActiveSubTab] = useState('spin');
+  const [activeSubTab, setActiveSubTab] = useState('medball'); // 'medball' | 'spin' | 'bands' | 'weights' | 'calisthenics'
+  const [coachBannerMsg, setCoachBannerMsg] = useState('');
+
+  // Inline edit state for logged training sessions (Item 5)
+  const [editingTrainingId, setEditingTrainingId] = useState(null);
+  const [editTrainingForm, setEditTrainingForm] = useState({
+    type: '',
+    summary: '',
+    calories: '',
+    rpe: '',
+  });
 
   const athleteAge = Number(userProfile.age) || 53;
   const maxHr = Number(userProfile.maxHr) || 220 - athleteAge;
   const bodyWeightLbs = Number(userProfile.weightLbs) || 229;
   const bodyWeightKg = bodyWeightLbs * 0.45359237;
 
+  // 8 kg Medicine Ball State (Item 6: sets, reps, RPE)
+  const [medBallExerciseName, setMedBallExerciseName] = useState(
+    MEDICINE_BALL_8KG_MOVEMENTS[0].name
+  );
+  const [medBallSets, setMedBallSets] = useState(4);
+  const [medBallReps, setMedBallReps] = useState(12);
+  const [medBallRpe, setMedBallRpe] = useState(7.5);
+
+  const selectedMedBallObj = useMemo(
+    () =>
+      MEDICINE_BALL_8KG_MOVEMENTS.find((m) => m.name === medBallExerciseName) ||
+      MEDICINE_BALL_8KG_MOVEMENTS[0],
+    [medBallExerciseName]
+  );
+
+  const medBallCalculation = useMemo(() => {
+    const ballMassKg = 8; // Fixed 8 kg Medicine Ball
+    const sets = Math.max(1, Number(medBallSets) || 1);
+    const reps = Math.max(1, Number(medBallReps) || 1);
+    const rpe = Math.min(10, Math.max(1, Number(medBallRpe) || 7));
+    const totalReps = sets * reps;
+    const totalVolumeKg = totalReps * ballMassKg;
+    const totalVolumeLbs = Math.round(totalVolumeKg * 2.20462);
+
+    // Mechanical work + RPE metabolic intensity multiplier
+    const rpeIntensityFactor = 0.8 + rpe * 0.045;
+    const workJ = totalReps * (ballMassKg + bodyWeightKg * 0.14) * 9.80665 * selectedMedBallObj.dispMeters;
+    const mechanicalKcal = (workJ / (4184 * 0.21)) * rpeIntensityFactor;
+    const afterburnBonus = sets * (selectedMedBallObj.metFactor * 0.6) * (rpe / 7);
+    const calories = Math.max(1, Math.round(mechanicalKcal + afterburnBonus));
+
+    let rpeZoneLabel = 'Controlled Power (RPE 6–7)';
+    if (rpe >= 9) rpeZoneLabel = 'Max CNS Output (RPE 9–10)';
+    else if (rpe >= 7.5) rpeZoneLabel = 'High Metabolic Drive (RPE 7.5–8.5)';
+    else if (rpe <= 5.5) rpeZoneLabel = 'Active Groove / Technique (RPE 1–5.5)';
+
+    return {
+      totalReps,
+      totalVolumeKg,
+      totalVolumeLbs,
+      calories,
+      rpe,
+      rpeZoneLabel,
+    };
+  }, [medBallSets, medBallReps, medBallRpe, bodyWeightKg, selectedMedBallObj]);
+
   // 1. Spin Bike State
   const [spinMinutes, setSpinMinutes] = useState(30);
   const [pulseCount15Sec, setPulseCount15Sec] = useState('');
   const [avgBpm, setAvgBpm] = useState(112);
+  const [spinRpe, setSpinRpe] = useState(7);
 
   const hrZones = useMemo(
     () => [
@@ -677,6 +884,7 @@ const AthleticTrainingModal = ({ onClose }) => {
   const [bandTensionLbs, setBandTensionLbs] = useState(60);
   const [bandReps, setBandReps] = useState(12);
   const [bandSets, setBandSets] = useState(4);
+  const [bandRpe, setBandRpe] = useState(7.5);
 
   const bandCalculation = useMemo(() => {
     const tensionLbs = Math.max(0, Number(bandTensionLbs) || 0);
@@ -702,6 +910,7 @@ const AthleticTrainingModal = ({ onClose }) => {
   const [freeWeightLbs, setFreeWeightLbs] = useState(45);
   const [freeWeightReps, setFreeWeightReps] = useState(10);
   const [freeWeightSets, setFreeWeightSets] = useState(4);
+  const [freeWeightRpe, setFreeWeightRpe] = useState(8);
 
   const freeWeightCalculation = useMemo(() => {
     const loadLbs = Math.max(0, Number(freeWeightLbs) || 0);
@@ -730,6 +939,7 @@ const AthleticTrainingModal = ({ onClose }) => {
   const [abSets, setAbSets] = useState(3);
   const [abStance, setAbStance] = useState('kneeling');
   const [plankSecondsPerSet, setPlankSecondsPerSet] = useState(60);
+  const [calisthenicRpe, setCalisthenicRpe] = useState(7.5);
 
   const selectedCalisthenicObj = useMemo(
     () =>
@@ -755,7 +965,7 @@ const AthleticTrainingModal = ({ onClose }) => {
         )
       );
       return {
-        summaryLabel: `${sets} sets × ${plankSecondsPerSet}s hold (${totalSec}s total)`,
+        summaryLabel: `${sets} sets × ${plankSecondsPerSet}s hold • RPE ${calisthenicRpe}`,
         totalKcal: kcal,
         detailText: `Isometric Core / Stabilization (${weightKg.toFixed(1)} kg)`,
       };
@@ -777,8 +987,8 @@ const AthleticTrainingModal = ({ onClose }) => {
     return {
       summaryLabel:
         selectedCalisthenicObj.mode === 'abwheel'
-          ? `${abStance} • ${abWeightValue}${abWeightUnit} • ${abReps} reps × ${sets} sets`
-          : `${abWeightValue}${abWeightUnit} • ${abReps} reps × ${sets} sets`,
+          ? `${abStance} • ${abReps} reps × ${sets} sets • RPE ${calisthenicRpe}`
+          : `${abReps} reps × ${sets} sets • RPE ${calisthenicRpe}`,
       totalKcal,
       detailText: `Mass: ${weightKg.toFixed(1)} kg • Disp: ${displacementMeters} m • Work: ${rawMechanicalKcal.toFixed(2)} kcal + Density`,
     };
@@ -790,7 +1000,49 @@ const AthleticTrainingModal = ({ onClose }) => {
     abSets,
     abStance,
     plankSecondsPerSet,
+    calisthenicRpe,
   ]);
+
+  const handleLogWithCoachFeedback = (sessionPayload, customCoachMsg) => {
+    addTrainingSession(sessionPayload);
+    setCoachBannerMsg(
+      customCoachMsg ||
+        `Coach: Strong work, Dan! ${sessionPayload.type} locked into recovery telemetry.`
+    );
+    setTimeout(() => setCoachBannerMsg(''), 3500);
+  };
+
+  const handleStartEditTraining = (log) => {
+    setEditingTrainingId(log.id);
+    setEditTrainingForm({
+      type: log.type || '',
+      summary: log.summary || '',
+      calories: String(log.calories ?? 0),
+      rpe: String(log.rpe ?? 7),
+    });
+  };
+
+  const handleSaveTrainingEdit = (id) => {
+    if (typeof updateTrainingSession === 'function') {
+      updateTrainingSession(id, {
+        type: editTrainingForm.type,
+        summary: editTrainingForm.summary,
+        calories: Number(editTrainingForm.calories) || 0,
+        rpe: Number(editTrainingForm.rpe) || 7,
+      });
+    }
+    setEditingTrainingId(null);
+  };
+
+  const telemetry = dailyActivity.recoveryTelemetry || {
+    lastRpe: 7,
+    avgRpe: 7,
+    readinessPct: 86,
+    recoveryHours: 14,
+    status: 'Prime Anabolic Window',
+    coachNote:
+      'Coach: Dan, your CNS readiness is primed. Hit those 8 kg medicine ball slams and V-taper pulls with crisp form!',
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-3 overflow-y-auto">
@@ -803,7 +1055,7 @@ const AthleticTrainingModal = ({ onClose }) => {
         />
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950/45 via-slate-950/55 to-slate-950/75 pointer-events-none" />
 
-        {/* Header */}
+        {/* Header with Dedicated Personal Coach Persona */}
         <div className="relative z-10 px-4 py-3.5 bg-slate-950/65 backdrop-blur-md border-b border-white/20 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <div className="p-2 rounded-2xl bg-indigo-500/25 border border-indigo-400/50 text-indigo-300 shrink-0">
@@ -811,10 +1063,10 @@ const AthleticTrainingModal = ({ onClose }) => {
             </div>
             <div className="min-w-0">
               <h2 className="text-sm font-black text-white drop-shadow truncate">
-                Athletic Training &amp; Schedule Matrix
+                Personal Coach &amp; Athletic Performance Hub
               </h2>
               <p className="text-[11px] text-slate-200 truncate">
-                Spin HR • Bands • Free Weights • Calisthenics &amp; Ab Wheel
+                8 kg Medicine Ball • Spin HR • V-Taper Bands • Recovery Telemetry
               </p>
             </div>
           </div>
@@ -831,12 +1083,45 @@ const AthleticTrainingModal = ({ onClose }) => {
           {/* Persistent Daily Recommended vs. Logged Intake Chart */}
           <PersistentAllowanceChart />
 
-          {/* Schedule vs. Actual Calendar Chart (Missed scheduled workouts in RED) */}
+          {/* Personal Coach & RPE Recovery Telemetry Card */}
+          <div className="rounded-2xl bg-indigo-950/75 backdrop-blur-md border border-indigo-400/40 p-3 space-y-2 shadow-lg">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Personal Coach Telemetry • {telemetry.status}</span>
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/40 text-emerald-200 text-[9px] font-black">
+                Readiness {telemetry.readinessPct}%
+              </span>
+            </div>
+
+            <p className="text-[11px] font-semibold text-slate-100 leading-snug">
+              {coachBannerMsg || telemetry.coachNote}
+            </p>
+
+            <div className="grid grid-cols-3 gap-1.5 text-center pt-0.5">
+              <div className="bg-slate-950/85 rounded-xl p-1.5 border border-white/10">
+                <div className="text-[8px] font-bold uppercase text-slate-400">Avg Session RPE</div>
+                <div className="text-xs font-black text-amber-300">{telemetry.avgRpe} / 10</div>
+              </div>
+              <div className="bg-slate-950/85 rounded-xl p-1.5 border border-white/10">
+                <div className="text-[8px] font-bold uppercase text-slate-400">CNS Readiness</div>
+                <div className="text-xs font-black text-emerald-300">{telemetry.readinessPct}%</div>
+              </div>
+              <div className="bg-slate-950/85 rounded-xl p-1.5 border border-white/10">
+                <div className="text-[8px] font-bold uppercase text-slate-400">Recovery Window</div>
+                <div className="text-xs font-black text-cyan-300">{telemetry.recoveryHours}h est.</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Schedule vs. Actual Calendar Chart */}
           <TrainingScheduleCalendarChart />
 
-          {/* 4 Modality Sub-Tabs */}
-          <div className="grid grid-cols-4 gap-1 bg-slate-950/70 backdrop-blur-md p-1 rounded-2xl border border-white/15">
+          {/* 5 Modality Sub-Tabs (Featuring 8kg Medicine Ball Module) */}
+          <div className="grid grid-cols-5 gap-1 bg-slate-950/70 backdrop-blur-md p-1 rounded-2xl border border-white/15">
             {[
+              { id: 'medball', label: '8kg Ball' },
               { id: 'spin', label: 'Spin HR' },
               { id: 'bands', label: 'Bands' },
               { id: 'weights', label: 'Weights' },
@@ -857,43 +1142,194 @@ const AthleticTrainingModal = ({ onClose }) => {
             ))}
           </div>
 
+          {/* MODULE 0: 8 KG MEDICINE BALL MODULE (Sets, Reps & RPE Telemetry) */}
+          {activeSubTab === 'medball' && (
+            <div className="space-y-3">
+              <div className="rounded-2xl bg-slate-950/75 border border-amber-400/40 p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1">
+                    <Flame className="w-3.5 h-3.5" />
+                    <span>8 kg (17.6 lb) Medicine Ball Conditioning</span>
+                  </span>
+                  <span className="text-[9px] font-bold text-slate-300">
+                    Target: {selectedMedBallObj.target}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-extrabold text-indigo-200 uppercase mb-1">
+                    Select 8 kg Medicine Ball Exercise
+                  </label>
+                  <select
+                    value={medBallExerciseName}
+                    onChange={(e) => setMedBallExerciseName(e.target.value)}
+                    className="w-full rounded-xl border border-white/20 bg-slate-950 px-2.5 py-2 text-xs font-bold text-white"
+                  >
+                    {MEDICINE_BALL_8KG_MOVEMENTS.map((mv) => (
+                      <option key={mv.name} value={mv.name} className="bg-slate-950 text-white">
+                        {mv.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Coach Cue Callout */}
+                <div className="rounded-xl bg-amber-500/15 border border-amber-400/35 px-2.5 py-1.5 text-[10px] font-bold text-amber-100">
+                  <span className="text-amber-300 font-black uppercase mr-1">Coach Cue:</span>
+                  {selectedMedBallObj.coachCue}
+                </div>
+
+                {/* Sets, Reps & RPE Inputs */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-200 uppercase mb-1">
+                      Sets
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={medBallSets}
+                      onChange={(e) => setMedBallSets(e.target.value)}
+                      className="w-full rounded-xl border border-white/20 bg-slate-950 px-2.5 py-1.5 text-xs font-black text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-200 uppercase mb-1">
+                      Reps / Set
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={medBallReps}
+                      onChange={(e) => setMedBallReps(e.target.value)}
+                      className="w-full rounded-xl border border-white/20 bg-slate-950 px-2.5 py-1.5 text-xs font-black text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-amber-300 uppercase mb-1">
+                      RPE (1–10)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      step="0.5"
+                      value={medBallRpe}
+                      onChange={(e) => setMedBallRpe(e.target.value)}
+                      className="w-full rounded-xl border border-amber-400/50 bg-slate-950 px-2.5 py-1.5 text-xs font-black text-amber-300"
+                    />
+                  </div>
+                </div>
+
+                {/* Interactive RPE Slider */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[9px] font-bold">
+                    <span className="text-slate-300">
+                      Rate of Perceived Exertion: <strong className="text-amber-300">RPE {medBallCalculation.rpe}</strong>
+                    </span>
+                    <span className="text-indigo-300">{medBallCalculation.rpeZoneLabel}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    step="0.5"
+                    value={medBallRpe}
+                    onChange={(e) => setMedBallRpe(e.target.value)}
+                    className="w-full accent-amber-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-indigo-950/70 backdrop-blur-md border border-indigo-400/50 p-3 flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-[10px] font-bold uppercase text-indigo-300">
+                    8 kg Ball Load: {medBallCalculation.totalVolumeKg} kg ({medBallCalculation.totalVolumeLbs} lbs) • RPE {medBallCalculation.rpe}
+                  </div>
+                  <div className="text-sm font-black text-white">
+                    Expenditure: {medBallCalculation.calories} kcal{' '}
+                    <span className="text-xs font-semibold text-slate-300">
+                      ({medBallCalculation.totalReps} explosive reps)
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleLogWithCoachFeedback(
+                      {
+                        type: medBallExerciseName,
+                        summary: `8 kg × ${medBallSets} sets × ${medBallReps} reps • RPE ${medBallCalculation.rpe}`,
+                        calories: medBallCalculation.calories,
+                        sets: Number(medBallSets) || 1,
+                        reps: Number(medBallReps) || 1,
+                        rpe: medBallCalculation.rpe,
+                      },
+                      `Coach: Explosive 8 kg work, Dan! ${medBallCalculation.totalReps} reps @ RPE ${medBallCalculation.rpe} logged to recovery telemetry.`
+                    )
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black flex items-center gap-1 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Log 8kg Set</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* TAB 1: SPIN BIKE (HEART RATE & ZONES) */}
           {activeSubTab === 'spin' && (
             <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <div>
                   <label className="block text-[10px] font-extrabold text-slate-200 uppercase mb-1">
-                    Duration (Min)
+                    Min
                   </label>
                   <input
                     type="number"
                     min="1"
                     value={spinMinutes}
                     onChange={(e) => setSpinMinutes(e.target.value)}
-                    className="w-full rounded-xl border border-white/20 bg-slate-950/80 px-2.5 py-1.5 text-xs font-black text-white"
+                    className="w-full rounded-xl border border-white/20 bg-slate-950/80 px-2 py-1.5 text-xs font-black text-white"
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] font-extrabold text-rose-300 uppercase mb-1">
-                    15s Pulse (×4)
+                    15s Pulse
                   </label>
                   <input
                     type="number"
                     value={pulseCount15Sec}
                     onChange={(e) => handlePulse15Change(e.target.value)}
-                    placeholder="e.g. 28 → 112"
-                    className="w-full rounded-xl border border-rose-400/50 bg-rose-950/50 px-2.5 py-1.5 text-xs font-black text-rose-200"
+                    placeholder="28→112"
+                    className="w-full rounded-xl border border-rose-400/50 bg-rose-950/50 px-2 py-1.5 text-xs font-black text-rose-200"
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] font-extrabold text-slate-200 uppercase mb-1">
-                    Avg HR (BPM)
+                    Avg BPM
                   </label>
                   <input
                     type="number"
                     value={avgBpm}
                     onChange={(e) => setAvgBpm(e.target.value)}
-                    className="w-full rounded-xl border border-white/20 bg-slate-950/80 px-2.5 py-1.5 text-xs font-black text-white"
+                    className="w-full rounded-xl border border-white/20 bg-slate-950/80 px-2 py-1.5 text-xs font-black text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-amber-300 uppercase mb-1">
+                    RPE (1–10)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="0.5"
+                    value={spinRpe}
+                    onChange={(e) => setSpinRpe(e.target.value)}
+                    className="w-full rounded-xl border border-amber-400/50 bg-slate-950/80 px-2 py-1.5 text-xs font-black text-amber-300"
                   />
                 </div>
               </div>
@@ -901,7 +1337,7 @@ const AthleticTrainingModal = ({ onClose }) => {
               <div className="rounded-2xl border border-white/20 bg-slate-950/65 backdrop-blur-md p-3 space-y-1.5">
                 <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-slate-200">
                   <span>
-                    Age {athleteAge} HR Zones (Max HR: {maxHr} BPM)
+                    Coach HR Pacing (Age {athleteAge} • Max {maxHr} BPM)
                   </span>
                   <span className="text-emerald-300">★ Zone 2 Fat Burn Target</span>
                 </div>
@@ -941,7 +1377,7 @@ const AthleticTrainingModal = ({ onClose }) => {
               <div className="rounded-2xl bg-indigo-950/70 backdrop-blur-md border border-indigo-400/50 p-3 flex items-center justify-between">
                 <div>
                   <div className="text-[10px] font-bold uppercase text-indigo-300">
-                    Active Zone: {activeSpinZone?.zone}
+                    Active Zone: {activeSpinZone?.zone} • RPE {spinRpe}
                   </div>
                   <div className="text-sm font-black text-white">
                     Estimated Burn: {spinCalories} kcal{' '}
@@ -953,12 +1389,16 @@ const AthleticTrainingModal = ({ onClose }) => {
                 <button
                   type="button"
                   onClick={() =>
-                    addTrainingSession({
-                      type: 'Spin Bike',
-                      summary: `${spinMinutes} min • ${avgBpm} BPM (${activeSpinZone?.zone.split(' (')[0]})`,
-                      calories: spinCalories,
-                      durationMinutes: Number(spinMinutes) || 0,
-                    })
+                    handleLogWithCoachFeedback(
+                      {
+                        type: 'Spin Bike',
+                        summary: `${spinMinutes} min • ${avgBpm} BPM (${activeSpinZone?.zone.split(' (')[0]}) • RPE ${spinRpe}`,
+                        calories: spinCalories,
+                        durationMinutes: Number(spinMinutes) || 0,
+                        rpe: Number(spinRpe) || 7,
+                      },
+                      `Coach: Steady aerobic work locked in, Dan! ${spinMinutes} mins in ${activeSpinZone?.zone.split(' (')[0]} protects lean mass while torching visceral fat.`
+                    )
                   }
                   className="px-3.5 py-2 rounded-xl bg-indigo-400 hover:bg-indigo-300 text-slate-950 text-xs font-black flex items-center gap-1"
                 >
@@ -974,7 +1414,7 @@ const AthleticTrainingModal = ({ onClose }) => {
             <div className="space-y-3">
               <div>
                 <label className="block text-[10px] font-extrabold text-indigo-200 uppercase mb-1">
-                  Resistance Band Exercise Selection
+                  Coach V-Taper &amp; Hypertrophy Band Selection
                 </label>
                 <select
                   value={bandMovement}
@@ -989,10 +1429,10 @@ const AthleticTrainingModal = ({ onClose }) => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <div>
                   <label className="block text-[10px] font-extrabold text-slate-200 uppercase mb-1">
-                    Band Rating (lbs)
+                    Band (lbs)
                   </label>
                   <input
                     type="number"
@@ -1000,7 +1440,7 @@ const AthleticTrainingModal = ({ onClose }) => {
                     step="5"
                     value={bandTensionLbs}
                     onChange={(e) => setBandTensionLbs(e.target.value)}
-                    className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2.5 py-1.5 text-xs font-black text-white"
+                    className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2 py-1.5 text-xs font-black text-white"
                   />
                 </div>
                 <div>
@@ -1012,7 +1452,7 @@ const AthleticTrainingModal = ({ onClose }) => {
                     min="1"
                     value={bandReps}
                     onChange={(e) => setBandReps(e.target.value)}
-                    className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2.5 py-1.5 text-xs font-black text-white"
+                    className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2 py-1.5 text-xs font-black text-white"
                   />
                 </div>
                 <div>
@@ -1024,7 +1464,21 @@ const AthleticTrainingModal = ({ onClose }) => {
                     min="1"
                     value={bandSets}
                     onChange={(e) => setBandSets(e.target.value)}
-                    className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2.5 py-1.5 text-xs font-black text-white"
+                    className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2 py-1.5 text-xs font-black text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-amber-300 uppercase mb-1">
+                    RPE (1–10)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="0.5"
+                    value={bandRpe}
+                    onChange={(e) => setBandRpe(e.target.value)}
+                    className="w-full rounded-xl border border-amber-400/50 bg-slate-950/85 px-2 py-1.5 text-xs font-black text-amber-300"
                   />
                 </div>
               </div>
@@ -1032,7 +1486,7 @@ const AthleticTrainingModal = ({ onClose }) => {
               <div className="rounded-2xl bg-indigo-950/70 backdrop-blur-md border border-indigo-400/50 p-3 flex items-center justify-between">
                 <div>
                   <div className="text-[10px] font-bold uppercase text-indigo-300">
-                    Volume Load: {bandCalculation.totalVolumeLbs.toLocaleString()} lbs
+                    Volume Load: {bandCalculation.totalVolumeLbs.toLocaleString()} lbs • RPE {bandRpe}
                   </div>
                   <div className="text-sm font-black text-white">
                     Expenditure: {bandCalculation.calories} kcal{' '}
@@ -1044,11 +1498,17 @@ const AthleticTrainingModal = ({ onClose }) => {
                 <button
                   type="button"
                   onClick={() =>
-                    addTrainingSession({
-                      type: `Bands: ${bandMovement.split(' (')[0]}`,
-                      summary: `${bandTensionLbs} lbs × ${bandReps} reps × ${bandSets} sets`,
-                      calories: bandCalculation.calories,
-                    })
+                    handleLogWithCoachFeedback(
+                      {
+                        type: `Bands: ${bandMovement.split(' (')[0]}`,
+                        summary: `${bandTensionLbs} lbs × ${bandReps} reps × ${bandSets} sets • RPE ${bandRpe}`,
+                        calories: bandCalculation.calories,
+                        sets: Number(bandSets) || 1,
+                        reps: Number(bandReps) || 1,
+                        rpe: Number(bandRpe) || 7.5,
+                      },
+                      `Coach: Quality peak contraction on ${bandMovement.split(' (')[0]}! ${bandCalculation.totalVolumeLbs.toLocaleString()} lbs volume logged.`
+                    )
                   }
                   className="px-3.5 py-2 rounded-xl bg-indigo-400 hover:bg-indigo-300 text-slate-950 text-xs font-black flex items-center gap-1"
                 >
@@ -1079,7 +1539,7 @@ const AthleticTrainingModal = ({ onClose }) => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <div>
                   <label className="block text-[10px] font-extrabold text-slate-200 uppercase mb-1">
                     Load (lbs)
@@ -1090,7 +1550,7 @@ const AthleticTrainingModal = ({ onClose }) => {
                     step="2.5"
                     value={freeWeightLbs}
                     onChange={(e) => setFreeWeightLbs(e.target.value)}
-                    className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2.5 py-1.5 text-xs font-black text-white"
+                    className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2 py-1.5 text-xs font-black text-white"
                   />
                 </div>
                 <div>
@@ -1102,7 +1562,7 @@ const AthleticTrainingModal = ({ onClose }) => {
                     min="1"
                     value={freeWeightReps}
                     onChange={(e) => setFreeWeightReps(e.target.value)}
-                    className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2.5 py-1.5 text-xs font-black text-white"
+                    className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2 py-1.5 text-xs font-black text-white"
                   />
                 </div>
                 <div>
@@ -1114,7 +1574,21 @@ const AthleticTrainingModal = ({ onClose }) => {
                     min="1"
                     value={freeWeightSets}
                     onChange={(e) => setFreeWeightSets(e.target.value)}
-                    className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2.5 py-1.5 text-xs font-black text-white"
+                    className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2 py-1.5 text-xs font-black text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-amber-300 uppercase mb-1">
+                    RPE (1–10)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="0.5"
+                    value={freeWeightRpe}
+                    onChange={(e) => setFreeWeightRpe(e.target.value)}
+                    className="w-full rounded-xl border border-amber-400/50 bg-slate-950/85 px-2 py-1.5 text-xs font-black text-amber-300"
                   />
                 </div>
               </div>
@@ -1122,7 +1596,7 @@ const AthleticTrainingModal = ({ onClose }) => {
               <div className="rounded-2xl bg-indigo-950/70 backdrop-blur-md border border-indigo-400/50 p-3 flex items-center justify-between">
                 <div>
                   <div className="text-[10px] font-bold uppercase text-indigo-300">
-                    Total Volume: {freeWeightCalculation.totalVolumeLbs.toLocaleString()} lbs
+                    Total Volume: {freeWeightCalculation.totalVolumeLbs.toLocaleString()} lbs • RPE {freeWeightRpe}
                   </div>
                   <div className="text-sm font-black text-white">
                     Expenditure: {freeWeightCalculation.calories} kcal{' '}
@@ -1134,11 +1608,17 @@ const AthleticTrainingModal = ({ onClose }) => {
                 <button
                   type="button"
                   onClick={() =>
-                    addTrainingSession({
-                      type: freeWeightMovement,
-                      summary: `${freeWeightLbs} lbs × ${freeWeightReps} reps × ${freeWeightSets} sets`,
-                      calories: freeWeightCalculation.calories,
-                    })
+                    handleLogWithCoachFeedback(
+                      {
+                        type: freeWeightMovement,
+                        summary: `${freeWeightLbs} lbs × ${freeWeightReps} reps × ${freeWeightSets} sets • RPE ${freeWeightRpe}`,
+                        calories: freeWeightCalculation.calories,
+                        sets: Number(freeWeightSets) || 1,
+                        reps: Number(freeWeightReps) || 1,
+                        rpe: Number(freeWeightRpe) || 8,
+                      },
+                      `Coach: Heavy iron logged! ${freeWeightMovement} at RPE ${freeWeightRpe} signals strong lean-tissue retention.`
+                    )
                   }
                   className="px-3.5 py-2 rounded-xl bg-indigo-400 hover:bg-indigo-300 text-slate-950 text-xs font-black flex items-center gap-1"
                 >
@@ -1154,7 +1634,7 @@ const AthleticTrainingModal = ({ onClose }) => {
             <div className="space-y-3">
               <div>
                 <label className="block text-[10px] font-extrabold text-indigo-200 uppercase mb-1">
-                  Calisthenics, Core &amp; Plyometrics Movement
+                  Calisthenics, Core &amp; Ab Wheel Movement
                 </label>
                 <select
                   value={calisthenicMovement}
@@ -1240,11 +1720,11 @@ const AthleticTrainingModal = ({ onClose }) => {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {selectedCalisthenicObj.mode === 'abwheel' && (
                   <div>
                     <label className="block text-[10px] font-extrabold text-slate-200 uppercase mb-1">
-                      Reps per Set
+                      Reps / Set
                     </label>
                     <input
                       type="number"
@@ -1267,14 +1747,19 @@ const AthleticTrainingModal = ({ onClose }) => {
                     className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2.5 py-1.5 text-xs font-black text-white"
                   />
                 </div>
-              </div>
-
-              <div className="rounded-2xl bg-slate-950/65 backdrop-blur-md border border-white/20 p-3 space-y-1 text-[11px]">
-                <div className="font-extrabold text-indigo-300">
-                  Mechanical Work &amp; Calisthenic Load Model
-                </div>
-                <div className="text-slate-200 font-mono text-[10px]">
-                  {calisthenicCalculation.detailText}
+                <div>
+                  <label className="block text-[10px] font-extrabold text-amber-300 uppercase mb-1">
+                    RPE (1–10)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="0.5"
+                    value={calisthenicRpe}
+                    onChange={(e) => setCalisthenicRpe(e.target.value)}
+                    className="w-full rounded-xl border border-amber-400/50 bg-slate-950/85 px-2.5 py-1.5 text-xs font-black text-amber-300"
+                  />
                 </div>
               </div>
 
@@ -1290,11 +1775,17 @@ const AthleticTrainingModal = ({ onClose }) => {
                 <button
                   type="button"
                   onClick={() =>
-                    addTrainingSession({
-                      type: calisthenicMovement.split(' (')[0],
-                      summary: calisthenicCalculation.summaryLabel,
-                      calories: calisthenicCalculation.totalKcal,
-                    })
+                    handleLogWithCoachFeedback(
+                      {
+                        type: calisthenicMovement.split(' (')[0],
+                        summary: calisthenicCalculation.summaryLabel,
+                        calories: calisthenicCalculation.totalKcal,
+                        sets: Number(abSets) || 1,
+                        reps: Number(abReps) || 1,
+                        rpe: Number(calisthenicRpe) || 7.5,
+                      },
+                      `Coach: Core stability locked in! ${calisthenicMovement.split(' (')[0]} reinforces your spine for heavy pulls.`
+                    )
                   }
                   className="px-3.5 py-2 rounded-xl bg-indigo-400 hover:bg-indigo-300 text-slate-950 text-xs font-black flex items-center gap-1"
                 >
@@ -1305,7 +1796,7 @@ const AthleticTrainingModal = ({ onClose }) => {
             </div>
           )}
 
-          {/* Logged Athletic Training Sessions Today */}
+          {/* Logged Athletic Training Sessions Today with Inline Pencil Edit & Delete Controls */}
           <div className="rounded-2xl border border-white/20 p-3 bg-slate-950/65 backdrop-blur-md space-y-2">
             <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-slate-200">
               <span>Today&apos;s Logged Training ({dailyActivity.trainingLogs?.length || 0})</span>
@@ -1313,30 +1804,104 @@ const AthleticTrainingModal = ({ onClose }) => {
                 Total Burned: {dailyActivity.caloriesBurned} kcal
               </span>
             </div>
-            <div className="space-y-1.5 max-h-36 overflow-y-auto">
-              {(dailyActivity.trainingLogs || []).map((log) => (
-                <div
-                  key={log.id}
-                  className="flex items-center justify-between bg-slate-950/85 border border-white/15 rounded-xl px-2.5 py-1.5 text-xs"
-                >
-                  <div className="min-w-0">
-                    <div className="font-black text-white truncate">{log.type}</div>
-                    <div className="text-[10px] text-slate-300 truncate">{log.summary}</div>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              {(dailyActivity.trainingLogs || []).map((log) => {
+                const isEditingThis = editingTrainingId === log.id;
+                return (
+                  <div
+                    key={log.id}
+                    className="bg-slate-950/85 border border-white/15 rounded-xl px-2.5 py-1.5 text-xs space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-black text-white truncate">{log.type}</div>
+                        <div className="text-[10px] text-slate-300 truncate">{log.summary}</div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="font-mono font-black text-indigo-300">
+                          {log.calories} kcal
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            isEditingThis
+                              ? setEditingTrainingId(null)
+                              : handleStartEditTraining(log)
+                          }
+                          className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-indigo-300 transition"
+                          title="Edit training log"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteTrainingSession(log.id)}
+                          className="p-1 rounded-lg bg-white/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition"
+                          title="Delete training log"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {isEditingThis && (
+                      <div className="rounded-lg bg-slate-900/90 border border-indigo-400/40 p-2 space-y-1.5">
+                        <div className="grid grid-cols-4 gap-1">
+                          <input
+                            type="text"
+                            value={editTrainingForm.type}
+                            onChange={(e) =>
+                              setEditTrainingForm((p) => ({ ...p, type: e.target.value }))
+                            }
+                            placeholder="Exercise"
+                            className="col-span-2 rounded bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-white"
+                          />
+                          <input
+                            type="number"
+                            value={editTrainingForm.calories}
+                            onChange={(e) =>
+                              setEditTrainingForm((p) => ({ ...p, calories: e.target.value }))
+                            }
+                            placeholder="Kcal"
+                            className="rounded bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-indigo-300"
+                          />
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="1"
+                            max="10"
+                            value={editTrainingForm.rpe}
+                            onChange={(e) =>
+                              setEditTrainingForm((p) => ({ ...p, rpe: e.target.value }))
+                            }
+                            placeholder="RPE"
+                            className="rounded bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-amber-300"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={editTrainingForm.summary}
+                            onChange={(e) =>
+                              setEditTrainingForm((p) => ({ ...p, summary: e.target.value }))
+                            }
+                            placeholder="Summary"
+                            className="flex-1 rounded bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-slate-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveTrainingEdit(log.id)}
+                            className="px-2.5 py-1 rounded bg-indigo-400 text-slate-950 text-[10px] font-black flex items-center gap-0.5"
+                          >
+                            <Save className="w-3 h-3" />
+                            <span>Save</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono font-black text-indigo-300">
-                      {log.calories} kcal
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => deleteTrainingSession(log.id)}
-                      className="text-rose-400 hover:text-rose-300"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1353,7 +1918,7 @@ function DashboardContent() {
     setSavedStacks,
     peptideHistory,
     logStackToDaily,
-    setIsScannerOpen,
+    openScannerForDaily,
   } = useAppContext();
 
   // Active modal state: null | 'stacks' | 'nutrition' | 'peptides' | 'activity' | 'profile'
@@ -1389,12 +1954,14 @@ function DashboardContent() {
     Math.round(((dailyNutrition.fiber || 0) / Math.max(1, dailyNutrition.targetFiber || 32)) * 100)
   );
 
+  const readinessPct = dailyActivity.recoveryTelemetry?.readinessPct ?? 86;
+
   // 4 Core Dashboard Tiles
   const tiles = [
     {
       id: 'stacks',
       title: 'Get Stacked',
-      subtitle: 'Morning • Afternoon • Evening Stacks',
+      subtitle: 'Morning • Afternoon • Evening + UPC Scan',
       primaryStat: `${savedStacks.length} Stacks`,
       secondaryStat: '750ml + Organika + Creatine + Collagen',
       bgImage: TILE_BACKGROUNDS.stacks,
@@ -1443,7 +2010,7 @@ function DashboardContent() {
             <span
               onClick={(e) => {
                 e.stopPropagation();
-                setIsScannerOpen(true);
+                openScannerForDaily();
               }}
               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/30 border border-emerald-400/50 text-emerald-200 hover:bg-emerald-500/50"
             >
@@ -1468,19 +2035,19 @@ function DashboardContent() {
     {
       id: 'activity',
       title: 'Athletic Training',
-      subtitle: 'Schedule Calendar • Spin • Bands • Weights',
+      subtitle: '8kg Med Ball • Spin • V-Taper Bands',
       primaryStat: `${dailyActivity.caloriesBurned} kcal`,
-      secondaryStat: `${dailyActivity.trainingLogs?.length || 0} Sessions • Zone 2 Fat Burn`,
+      secondaryStat: `Coach Readiness: ${readinessPct}% • ${dailyActivity.trainingLogs?.length || 0} Sessions`,
       bgImage: TILE_BACKGROUNDS.activity,
       icon: Dumbbell,
       accent: 'from-indigo-600/80 to-slate-950/95',
       chart: (
         <div className="flex flex-col items-end gap-1">
-          <div className="px-2 py-1 rounded-lg bg-emerald-500/25 border border-emerald-400/40 text-emerald-200 text-[9px] font-black flex items-center gap-1">
-            <HeartPulse className="w-3 h-3 text-rose-400" />
-            <span>Z2: 100–117</span>
+          <div className="px-2 py-1 rounded-lg bg-amber-500/25 border border-amber-400/40 text-amber-200 text-[9px] font-black flex items-center gap-1">
+            <Flame className="w-3 h-3 text-amber-400" />
+            <span>8kg Ball</span>
           </div>
-          <span className="text-[9px] font-bold text-indigo-200">Age 53 • Max 167</span>
+          <span className="text-[9px] font-bold text-indigo-200">RPE Coach</span>
         </div>
       ),
     },
@@ -1555,7 +2122,7 @@ function DashboardContent() {
         })}
       </main>
 
-      {/* Modals for Each Tile (Preserving Active Visible Tile Background Image & Persistent Comparison Chart) */}
+      {/* Modals for Each Tile */}
       {activeTileModal === 'stacks' && (
         <StackManager
           isOpen={true}
@@ -1589,10 +2156,10 @@ function DashboardContent() {
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-sm font-black text-white drop-shadow truncate">
-                    Peptide Injection &amp; Clinical Remission Protocol
+                    Peptide Protocol &amp; Dose Calculator
                   </h2>
                   <p className="text-[11px] text-slate-200 truncate">
-                    0.3 / 0.5 / 1.0 ml Syringe • Friendly Injection Sites • NHL Guardrail
+                    Scannable Protocol Cards • Syringe Draw • NHL Guard
                   </p>
                 </div>
               </div>

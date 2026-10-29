@@ -1,5 +1,5 @@
 // src/context/AppContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { VISUAL_ASSET_LIBRARY } from '../utils/backgroundEngine';
 import { DANS_MORNING_STACK } from '../utils/nutrientEngine';
 import { MICRONUTRIENT_FIELDS, ESSENTIAL_AMINO_ACIDS } from '../data/initialData';
@@ -10,7 +10,7 @@ import {
 
 const AppContext = createContext();
 
-function toIsoDateKey(d = new Date()) {
+export function toIsoDateKey(d = new Date()) {
   const yr = d.getFullYear();
   const mo = String(d.getMonth() + 1).padStart(2, '0');
   const da = String(d.getDate()).padStart(2, '0');
@@ -45,10 +45,17 @@ function buildInitialCalendarSchedule() {
   return { scheduled, completed };
 }
 
-const DEFAULT_MICROS_LOGGED = MICRONUTRIENT_FIELDS.reduce((acc, m) => {
-  acc[m.key] = 0;
-  return acc;
-}, {});
+export const createBlankMicros = () =>
+  MICRONUTRIENT_FIELDS.reduce((acc, m) => {
+    acc[m.key] = 0;
+    return acc;
+  }, {});
+
+export const createBlankAminos = () =>
+  ESSENTIAL_AMINO_ACIDS.reduce((acc, a) => {
+    acc[a.key] = 0;
+    return acc;
+  }, {});
 
 const DEFAULT_MICROS_TARGETS = MICRONUTRIENT_FIELDS.reduce((acc, m) => {
   acc[m.key] = m.defaultTarget;
@@ -56,6 +63,7 @@ const DEFAULT_MICROS_TARGETS = MICRONUTRIENT_FIELDS.reduce((acc, m) => {
 }, {});
 
 const INITIAL_NUTRITION = {
+  dateKey: toIsoDateKey(new Date()),
   calories: 0,
   targetCalories: 1900, // 1,850–1,950 kcal/day
   protein: 0,
@@ -68,18 +76,8 @@ const INITIAL_NUTRITION = {
   fats: 0,
   targetFats: 65,
   meals: [],
-  micros: { ...DEFAULT_MICROS_LOGGED },
-  aminos: {
-    leucine: 0,
-    isoleucine: 0,
-    valine: 0,
-    lysine: 0,
-    methionine: 0,
-    phenylalanine: 0,
-    threonine: 0,
-    tryptophan: 0,
-    histidine: 0,
-  },
+  micros: createBlankMicros(),
+  aminos: createBlankAminos(),
   targets: {
     micros: { ...DEFAULT_MICROS_TARGETS },
     aminos: {
@@ -105,21 +103,33 @@ const INITIAL_HYDRATION = {
 
 const initialCal = buildInitialCalendarSchedule();
 
+const INITIAL_RECOVERY_TELEMETRY = {
+  lastRpe: 7,
+  avgRpe: 7.0,
+  readinessPct: 92,
+  recoveryHours: 14,
+  status: 'Primed for Explosive Output',
+  coachNote:
+    'Coach Assessment: Readiness is 92%. CNS is fresh—drive full hip extension on 8 kg Medicine Ball work and keep Zone 2 Spin heart rate locked between 100–117 BPM.',
+};
+
 const INITIAL_ACTIVITY = {
   steps: 4200,
   targetSteps: 8500,
   activeMinutes: 35,
   targetActiveMinutes: 45,
   caloriesBurned: 245,
-  workoutType: 'Spin Bike (Zone 2) + Resistance Bands + Ab Wheel',
+  workoutType: 'Spin Bike (Zone 2) + Resistance Bands + 8kg Med Ball',
   scheduledDates: initialCal.scheduled,
   completedDates: initialCal.completed,
+  recoveryTelemetry: INITIAL_RECOVERY_TELEMETRY,
   trainingLogs: [
     {
       id: 'init_spin_1',
       type: 'Spin Bike',
       summary: '25 min • 114 BPM (Zone 2 Fat Burn)',
       calories: 185,
+      rpe: 6,
       dateKey: toIsoDateKey(new Date()),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
@@ -128,6 +138,7 @@ const INITIAL_ACTIVITY = {
       type: 'Resistance Bands',
       summary: 'Back/V-Taper • 60 lbs × 12 reps × 3 sets',
       calories: 42,
+      rpe: 7,
       dateKey: toIsoDateKey(new Date()),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
@@ -136,6 +147,7 @@ const INITIAL_ACTIVITY = {
       type: 'Ab Wheel Rollouts',
       summary: 'Kneeling • 229 lbs • 12 reps × 3 sets',
       calories: 18,
+      rpe: 7,
       dateKey: toIsoDateKey(new Date()),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
@@ -165,11 +177,103 @@ const INITIAL_PEPTIDE_HISTORY = [
 ];
 
 /**
+ * Computes Recovery Telemetry & Coach Feedback from logged workouts and RPE
+ */
+function computeRecoveryTelemetry(trainingLogs = []) {
+  if (!Array.isArray(trainingLogs) || trainingLogs.length === 0) {
+    return {
+      lastRpe: null,
+      avgRpe: 0,
+      readinessPct: 100,
+      recoveryHours: 0,
+      status: '100% Recovered — Ready to Train',
+      coachNote:
+        "Coach's Corner: Zero CNS fatigue accumulated today. Hit your 8 kg medicine ball slams or V-taper band work with crisp technique!",
+    };
+  }
+
+  const rpeLogs = trainingLogs.map((t) => Number(t.rpe) || 7);
+  const lastRpe = rpeLogs[0];
+  const avgRpe = Math.round((rpeLogs.reduce((a, b) => a + b, 0) / rpeLogs.length) * 10) / 10;
+  const totalSessions = trainingLogs.length;
+
+  const fatiguePenalty = Math.min(45, Math.round(avgRpe * 3.2 + totalSessions * 4));
+  const readinessPct = Math.max(52, 100 - fatiguePenalty);
+  const recoveryHours = Math.min(48, Math.max(8, Math.round(avgRpe * 2.4 + totalSessions * 2)));
+
+  let status = 'Primed & Balanced';
+  let coachNote =
+    'Coach Feedback: Solid work rate today. Keep hydration above 3,000 ml and hit your 180g protein target to lock in lean tissue.';
+
+  if (lastRpe >= 9 || avgRpe >= 8.5) {
+    status = 'High CNS Load — Active Recovery Advised';
+    coachNote = `Coach Feedback: High-intensity output (RPE ${lastRpe}/10)! Your nervous system needs ~${recoveryHours}h recovery. Prioritize 40g protein + leucine now and extra electrolytes.`;
+  } else if (lastRpe >= 7.5) {
+    status = 'Optimal Recomp Stimulus';
+    coachNote = `Coach Feedback: Sweet-spot intensity (RPE ${lastRpe}/10). Great power transfer on the 8 kg medicine ball & resistance work without spiking cortisol.`;
+  } else {
+    status = 'Aerobic / Recovery Pace';
+    coachNote = `Coach Feedback: Controlled RPE ${lastRpe}/10 session. Joints and facial tissue stay protected while burning pure fat in Zone 2.`;
+  }
+
+  return {
+    lastRpe,
+    avgRpe,
+    readinessPct,
+    recoveryHours,
+    status,
+    coachNote,
+  };
+}
+
+/**
+ * Recomputes dailyNutrition totals strictly from its `meals` array so edits/deletions stay 100% accurate.
+ */
+function recomputeNutritionFromMeals(prevNutrition, mealsList) {
+  const nextMicros = createBlankMicros();
+  const nextAminos = createBlankAminos();
+  let calories = 0;
+  let protein = 0;
+  let carbs = 0;
+  let fiber = 0;
+  let fats = 0;
+
+  mealsList.forEach((m) => {
+    calories += Number(m.calories) || 0;
+    protein += Number(m.protein) || 0;
+    carbs += Number(m.carbs) || 0;
+    fiber += Number(m.fiber) || 0;
+    fats += Number(m.fats) || 0;
+
+    MICRONUTRIENT_FIELDS.forEach(({ key }) => {
+      nextMicros[key] =
+        Math.round(((nextMicros[key] || 0) + (Number(m.micros?.[key]) || 0)) * 10) / 10;
+    });
+
+    ESSENTIAL_AMINO_ACIDS.forEach(({ key }) => {
+      nextAminos[key] = Math.round((nextAminos[key] || 0) + (Number(m.aminos?.[key]) || 0));
+    });
+  });
+
+  const roundedCarbs = Math.round(carbs * 10) / 10;
+  const roundedFiber = Math.round(fiber * 10) / 10;
+
+  return {
+    ...prevNutrition,
+    calories: Math.round(calories),
+    protein: Math.round(protein * 10) / 10,
+    carbs: roundedCarbs,
+    fiber: roundedFiber,
+    netCarbs: Math.max(0, Math.round((roundedCarbs - roundedFiber) * 10) / 10),
+    fats: Math.round(fats * 10) / 10,
+    micros: nextMicros,
+    aminos: nextAminos,
+    meals: mealsList,
+  };
+}
+
+/**
  * Automated, Read-Only mTOR Spectrum Computation Engine
- * Strictly derives mTORC1 vs. AMPK/Autophagy signaling from daily charting:
- * 1) Fasting window & meal timing (`meals`)
- * 2) Protein & Leucine threshold (`protein`, `aminos.leucine`)
- * 3) Logged workouts (`trainingLogs` resistance tension vs. fasted cardio)
  */
 function computeAutomatedMtorState(dailyNutrition, dailyActivity) {
   const proteinG = Number(dailyNutrition.protein) || 0;
@@ -179,16 +283,15 @@ function computeAutomatedMtorState(dailyNutrition, dailyActivity) {
   const meals = Array.isArray(dailyNutrition.meals) ? dailyNutrition.meals : [];
   const trainingLogs = Array.isArray(dailyActivity.trainingLogs) ? dailyActivity.trainingLogs : [];
 
-  // Determine caloric meals (> 15 kcal) to compute fasting hours
-  const caloricMeals = meals.filter((m) => (Number(m.calories) || 0) > 15 || (Number(m.protein) || 0) > 3);
+  const caloricMeals = meals.filter(
+    (m) => (Number(m.calories) || 0) > 15 || (Number(m.protein) || 0) > 3
+  );
   let fastingHours = 16;
 
   if (caloricMeals.length === 0 && calories <= 15 && proteinG <= 3) {
-    // Fasted state: derive hours since 20:00 prior evening (typical 14-18h window)
     const nowHour = new Date().getHours();
     fastingHours = Math.max(12, Math.min(20, nowHour + 4));
   } else {
-    // Fed state: calculate elapsed hours since most recent meal (or feeding state)
     const latestMeal = caloricMeals[0];
     if (latestMeal?.loggedAtMs) {
       const elapsedHrs = Math.max(0, (Date.now() - Number(latestMeal.loggedAtMs)) / 3600000);
@@ -198,40 +301,31 @@ function computeAutomatedMtorState(dailyNutrition, dailyActivity) {
     }
   }
 
-  // Workout signaling: Resistance bands / weights / core vs. Spin cardio
   const hasResistanceWorkout = trainingLogs.some((t) =>
-    /band|weight|ab wheel|squat|press|row|curl|pull|push|core|calisthenic/i.test(t.type || '')
+    /band|weight|ab wheel|med ball|medicine ball|slam|twist|wall ball|woodchopper|squat|press|row|curl|pull|push|core|calisthenic/i.test(
+      t.type || ''
+    )
   );
   const hasCardioWorkout = trainingLogs.some((t) => /spin|bike|cardio|zone/i.test(t.type || ''));
 
-  // Continuous mTOR Score (8 to 96)
-  // Base fasted score starts low in Autophagy/AMPK (18), rises with Leucine, Protein, and Resistance mechanical tension
   let rawScore = 20;
 
-  // Fasting suppression (longer fast > 12h drives AMPK deeper toward 10-25%)
   if (fastingHours >= 12) {
     rawScore -= Math.min(12, (fastingHours - 12) * 2);
   } else {
-    // Recently fed window
     rawScore += Math.max(0, 14 - fastingHours * 2);
   }
 
-  // Leucine ribosomal mTORC1 trigger (2.5g - 3.0g threshold is primary driver)
   rawScore += Math.min(38, leucineG * 13.5);
-
-  // Total daily protein contribution
   rawScore += Math.min(24, (proteinG / targetProteinG) * 24);
 
-  // Workout modulation
   if (hasResistanceWorkout && (proteinG >= 15 || leucineG >= 0.8)) {
-    // Post-resistance + amino availability amplifies mTORC1 muscle protein synthesis
     rawScore += 12;
   } else if (hasResistanceWorkout) {
     rawScore += 5;
   }
 
   if (hasCardioWorkout && proteinG < 15 && calories < 100) {
-    // Fasted Zone 2 Spin Bike deepens AMPK / Autophagy
     rawScore -= 6;
   }
 
@@ -277,18 +371,45 @@ export const AppProvider = ({ children }) => {
   });
 
   const [dailyNutrition, setDailyNutrition] = useState(() => {
+    const todayKey = toIsoDateKey(new Date());
+    const savedDateKey = localStorage.getItem('allIn_lastActiveDate_v6');
     const saved = localStorage.getItem('allIn_dailyNutrition_v6');
+
     if (saved) {
       const parsed = JSON.parse(saved);
+      // Strict Midnight Rollover Check: if saved date is from a prior day, reset all daily supplements, Vitamin C, micros, aminos, and macros to blank/0
+      if (savedDateKey && savedDateKey !== todayKey) {
+        return {
+          ...INITIAL_NUTRITION,
+          dateKey: todayKey,
+          targetCalories: parsed.targetCalories ?? INITIAL_NUTRITION.targetCalories,
+          targetProtein: parsed.targetProtein ?? INITIAL_NUTRITION.targetProtein,
+          targetCarbs: parsed.targetCarbs ?? INITIAL_NUTRITION.targetCarbs,
+          targetFiber: parsed.targetFiber ?? INITIAL_NUTRITION.targetFiber,
+          targetFats: parsed.targetFats ?? INITIAL_NUTRITION.targetFats,
+          targets: {
+            micros: {
+              ...INITIAL_NUTRITION.targets.micros,
+              ...(parsed?.targets?.micros || {}),
+            },
+            aminos: {
+              ...INITIAL_NUTRITION.targets.aminos,
+              ...(parsed?.targets?.aminos || {}),
+            },
+          },
+        };
+      }
+
       return {
         ...INITIAL_NUTRITION,
         ...parsed,
+        dateKey: todayKey,
         micros: {
-          ...INITIAL_NUTRITION.micros,
+          ...createBlankMicros(),
           ...(parsed?.micros || {}),
         },
         aminos: {
-          ...INITIAL_NUTRITION.aminos,
+          ...createBlankAminos(),
           ...(parsed?.aminos || {}),
         },
         targets: {
@@ -307,19 +428,33 @@ export const AppProvider = ({ children }) => {
   });
 
   const [dailyHydration, setDailyHydration] = useState(() => {
+    const todayKey = toIsoDateKey(new Date());
+    const savedDateKey = localStorage.getItem('allIn_lastActiveDate_v6');
     const saved = localStorage.getItem('allIn_dailyHydration_v6');
-    return saved ? JSON.parse(saved) : INITIAL_HYDRATION;
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (savedDateKey && savedDateKey !== todayKey) {
+        return {
+          ...INITIAL_HYDRATION,
+          targetMl: parsed.targetMl ?? INITIAL_HYDRATION.targetMl,
+        };
+      }
+      return parsed;
+    }
+    return INITIAL_HYDRATION;
   });
 
   const [dailyActivity, setDailyActivity] = useState(() => {
     const saved = localStorage.getItem('allIn_dailyActivity_v6');
     if (saved) {
       const parsed = JSON.parse(saved);
+      const logs = parsed.trainingLogs || INITIAL_ACTIVITY.trainingLogs;
       return {
         ...INITIAL_ACTIVITY,
         ...parsed,
         scheduledDates: parsed.scheduledDates || INITIAL_ACTIVITY.scheduledDates,
         completedDates: parsed.completedDates || INITIAL_ACTIVITY.completedDates,
+        recoveryTelemetry: parsed.recoveryTelemetry || computeRecoveryTelemetry(logs),
       };
     }
     return INITIAL_ACTIVITY;
@@ -353,11 +488,31 @@ export const AppProvider = ({ children }) => {
     computeAutomatedMtorState(INITIAL_NUTRITION, INITIAL_ACTIVITY)
   );
 
+  // UPC Scanner state: supports scanning into Daily Nutrition OR directly into Stack Builder
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannerTargetMode, setScannerTargetMode] = useState('daily'); // 'daily' | 'stack'
+  const stackScanCallbackRef = useRef(null);
+
+  const openScannerForStack = useCallback((onProductScanned) => {
+    stackScanCallbackRef.current = onProductScanned;
+    setScannerTargetMode('stack');
+    setIsScannerOpen(true);
+  }, []);
+
+  const openScannerForDaily = useCallback(() => {
+    stackScanCallbackRef.current = null;
+    setScannerTargetMode('daily');
+    setIsScannerOpen(true);
+  }, []);
+
   const [syncStatusBadge, setSyncStatusBadge] = useState('Syncing...');
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
 
-  // Persist all state slices
+  // Persist all state slices + current active date key
+  useEffect(() => {
+    localStorage.setItem('allIn_lastActiveDate_v6', toIsoDateKey(new Date()));
+  }, [dailyNutrition, dailyHydration]);
+
   useEffect(() => {
     localStorage.setItem('allIn_userProfile_v6', JSON.stringify(userProfile));
   }, [userProfile]);
@@ -397,12 +552,11 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('allIn_mtorState_v6', JSON.stringify(mtorState));
   }, [mtorState]);
 
-  // Register Service Worker on mount for native PWA WebAPK & Web Push Notifications
   useEffect(() => {
     registerAllInServiceWorker();
   }, []);
 
-  // Automatically recalculate read-only mTOR state strictly from daily charting (fasting, protein/leucine, workouts)
+  // Automatically recalculate read-only mTOR state strictly from daily charting
   useEffect(() => {
     const nextMtor = computeAutomatedMtorState(dailyNutrition, dailyActivity);
     setMtorState(nextMtor);
@@ -415,6 +569,54 @@ export const AppProvider = ({ children }) => {
     dailyActivity.trainingLogs,
     dailyActivity.caloriesBurned,
   ]);
+
+  /**
+   * Strict Midnight Reset: clears all daily supplements, Vitamin C (e.g. 60mg), micronutrients,
+   * logged amino acids, meals, and hydration back to 0/blank at 00:00 rollover.
+   */
+  const resetDailySupplementsAndAminosAtMidnight = useCallback(() => {
+    const newDateKey = toIsoDateKey(new Date());
+    localStorage.setItem('allIn_lastActiveDate_v6', newDateKey);
+
+    setDailyNutrition((prev) => ({
+      ...INITIAL_NUTRITION,
+      dateKey: newDateKey,
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fiber: 0,
+      netCarbs: 0,
+      fats: 0,
+      meals: [],
+      micros: createBlankMicros(), // Clears Vitamin C (60mg) and all 15 vitamins/minerals to 0
+      aminos: createBlankAminos(), // Clears all 9 essential amino acids to 0
+      targetCalories: prev.targetCalories,
+      targetProtein: prev.targetProtein,
+      targetCarbs: prev.targetCarbs,
+      targetFiber: prev.targetFiber,
+      targetFats: prev.targetFats,
+      targets: prev.targets,
+    }));
+
+    setDailyHydration((prev) => ({
+      ...INITIAL_HYDRATION,
+      currentMl: 0,
+      electrolytePackets: 0,
+      creatineGrams: 0,
+      targetMl: prev.targetMl,
+    }));
+
+    setDailyActivity((prev) => ({
+      ...INITIAL_ACTIVITY,
+      steps: 0,
+      activeMinutes: 0,
+      caloriesBurned: 0,
+      trainingLogs: [],
+      recoveryTelemetry: computeRecoveryTelemetry([]),
+      scheduledDates: prev.scheduledDates,
+      completedDates: prev.completedDates,
+    }));
+  }, []);
 
   const executePersistentSync = useCallback(
     (reason = 'launch') => {
@@ -451,23 +653,35 @@ export const AppProvider = ({ children }) => {
           peptidesLogged: peptideHistory.slice(0, 5),
         };
         setHistoricalLogs((prev) => [snapshotEntry, ...prev]);
-        setSyncStatusBadge(`Midnight sync complete (${timeLabel}) • Scheduled 00:00`);
+
+        // Strictly clear daily supplements, Vitamin C (60mg), micros, and logged amino acids at 00:00
+        resetDailySupplementsAndAminosAtMidnight();
+
+        setSyncStatusBadge(`Midnight reset & sync complete (${timeLabel}) • 00:00`);
         if (userProfile.notificationsEnabled) {
           triggerDeviceNotification(
-            'All In — Midnight Sync Complete',
-            'Your daily nutrition, hydration, and training logs have been archived.'
+            'All In — Midnight Reset Complete',
+            'Daily supplements, Vitamin C, and amino acids have been archived and reset to blank for the new day.'
           );
         }
       } else if (reason === 'manual') {
-        setSyncStatusBadge(`Synced ${timeLabel} • Midnight sync scheduled`);
+        setSyncStatusBadge(`Synced ${timeLabel} • Midnight reset scheduled`);
       } else {
-        setSyncStatusBadge('Synced on launch • Midnight sync scheduled');
+        setSyncStatusBadge('Synced on launch • 00:00 reset scheduled');
       }
     },
-    [userProfile, dailyNutrition, dailyHydration, dailyActivity, peptideHistory, mtorState]
+    [
+      userProfile,
+      dailyNutrition,
+      dailyHydration,
+      dailyActivity,
+      peptideHistory,
+      mtorState,
+      resetDailySupplementsAndAminosAtMidnight,
+    ]
   );
 
-  // Automatic Sync on App Mount + Daily Local Midnight (00:00:00) Scheduler
+  // Automatic Sync on App Mount + Daily Local Midnight (00:00:00) Scheduler + Visibility Rollover Guard
   useEffect(() => {
     executePersistentSync('launch');
 
@@ -494,8 +708,21 @@ export const AppProvider = ({ children }) => {
 
     scheduleNextMidnightSync();
 
+    // Also check on tab focus / visibilitychange if the date rolled past 00:00 while phone was asleep
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const currentKey = toIsoDateKey(new Date());
+        const storedKey = localStorage.getItem('allIn_lastActiveDate_v6');
+        if (storedKey && storedKey !== currentKey) {
+          executePersistentSync('midnight');
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       if (midnightTimeoutId) clearTimeout(midnightTimeoutId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -517,7 +744,9 @@ export const AppProvider = ({ children }) => {
       const nextMicros = { ...(prev.micros || {}) };
       MICRONUTRIENT_FIELDS.forEach(({ key }) => {
         nextMicros[key] =
-          Math.round(((Number(prev.micros?.[key]) || 0) + (Number(stackTotals.micros?.[key]) || 0)) * 10) / 10;
+          Math.round(
+            ((Number(prev.micros?.[key]) || 0) + (Number(stackTotals.micros?.[key]) || 0)) * 10
+          ) / 10;
       });
 
       const nextAminos = { ...(prev.aminos || {}) };
@@ -578,6 +807,56 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Inline Edit handler for Today's Logged Nutrition Meals
+  const updateMealInDaily = (mealId, updatedFields) => {
+    setDailyNutrition((prev) => {
+      const updatedMeals = (prev.meals || []).map((m) => {
+        if (m.id !== mealId) return m;
+        const c = Number(updatedFields.carbs ?? m.carbs) || 0;
+        const f = Number(updatedFields.fiber ?? m.fiber) || 0;
+        return {
+          ...m,
+          ...updatedFields,
+          calories: Math.round(Number(updatedFields.calories ?? m.calories) || 0),
+          protein: Math.round((Number(updatedFields.protein ?? m.protein) || 0) * 10) / 10,
+          carbs: Math.round(c * 10) / 10,
+          fiber: Math.round(f * 10) / 10,
+          netCarbs: Math.max(0, Math.round((c - f) * 10) / 10),
+          fats: Math.round((Number(updatedFields.fats ?? m.fats) || 0) * 10) / 10,
+        };
+      });
+      return recomputeNutritionFromMeals(prev, updatedMeals);
+    });
+  };
+
+  // Inline Edit handler for Historical Logs in Profile -> Logs Tab
+  const updateHistoricalLog = (logId, updatedFields) => {
+    setHistoricalLogs((prev) =>
+      prev.map((item) => {
+        if (item.id !== logId) return item;
+        return {
+          ...item,
+          date: updatedFields.date ?? item.date,
+          weightLbs: Number(updatedFields.weightLbs ?? item.weightLbs) || item.weightLbs,
+          nutrition: {
+            ...(item.nutrition || {}),
+            calories: Number(updatedFields.calories ?? item.nutrition?.calories) || 0,
+            protein: Number(updatedFields.protein ?? item.nutrition?.protein) || 0,
+          },
+          hydration: {
+            ...(item.hydration || {}),
+            currentMl: Number(updatedFields.currentMl ?? item.hydration?.currentMl) || 0,
+          },
+          activity: {
+            ...(item.activity || {}),
+            caloriesBurned:
+              Number(updatedFields.caloriesBurned ?? item.activity?.caloriesBurned) || 0,
+          },
+        };
+      })
+    );
+  };
+
   // Peptide CRUD handlers
   const addPeptideEntry = (entry) => {
     setPeptideHistory((prev) => [entry, ...prev]);
@@ -602,36 +881,71 @@ export const AppProvider = ({ children }) => {
     setPeptideHistory((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Athletic Training Session Logger & Schedule Calendar Toggles
-  const addTrainingSession = ({ type, summary, calories, durationMinutes = 0, dateKey }) => {
+  // Athletic Training Session Logger & Schedule Calendar Toggles + RPE Recovery Telemetry
+  const addTrainingSession = ({
+    type,
+    summary,
+    calories,
+    durationMinutes = 0,
+    rpe = 7,
+    dateKey,
+  }) => {
     const kcal = Math.max(1, Math.round(Number(calories) || 0));
     const mins = Math.max(0, Math.round(Number(durationMinutes) || 0));
+    const numericRpe = Math.max(1, Math.min(10, Number(rpe) || 7));
     const targetDateKey = dateKey || toIsoDateKey(new Date());
     const newSession = {
       id: `train_${Date.now()}`,
       type,
       summary,
       calories: kcal,
+      rpe: numericRpe,
       dateKey: targetDateKey,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
-    setDailyActivity((prev) => ({
-      ...prev,
-      caloriesBurned: (Number(prev.caloriesBurned) || 0) + kcal,
-      activeMinutes: (Number(prev.activeMinutes) || 0) + mins,
-      completedDates: {
-        ...(prev.completedDates || {}),
-        [targetDateKey]: true,
-      },
-      trainingLogs: [newSession, ...(prev.trainingLogs || [])],
-    }));
+    setDailyActivity((prev) => {
+      const nextLogs = [newSession, ...(prev.trainingLogs || [])];
+      return {
+        ...prev,
+        caloriesBurned: (Number(prev.caloriesBurned) || 0) + kcal,
+        activeMinutes: (Number(prev.activeMinutes) || 0) + mins,
+        completedDates: {
+          ...(prev.completedDates || {}),
+          [targetDateKey]: true,
+        },
+        trainingLogs: nextLogs,
+        recoveryTelemetry: computeRecoveryTelemetry(nextLogs),
+      };
+    });
 
     if (userProfile.notificationsEnabled) {
       triggerDeviceNotification(
-        'All In — Workout Completed',
-        `${type}: ${kcal} kcal burned (${summary})`
+        'All In Coach — Session Logged!',
+        `${type}: ${kcal} kcal burned (RPE ${numericRpe}/10 • ${summary})`
       );
     }
+  };
+
+  const updateTrainingSession = (id, updatedFields) => {
+    setDailyActivity((prev) => {
+      const nextLogs = (prev.trainingLogs || []).map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              ...updatedFields,
+              calories: Math.max(1, Math.round(Number(updatedFields.calories ?? t.calories) || 0)),
+              rpe: Math.max(1, Math.min(10, Number(updatedFields.rpe ?? t.rpe) || 7)),
+            }
+          : t
+      );
+      const totalBurned = nextLogs.reduce((acc, item) => acc + (Number(item.calories) || 0), 0);
+      return {
+        ...prev,
+        caloriesBurned: totalBurned,
+        trainingLogs: nextLogs,
+        recoveryTelemetry: computeRecoveryTelemetry(nextLogs),
+      };
+    });
   };
 
   const toggleCalendarDateStatus = (dateKey) => {
@@ -662,10 +976,12 @@ export const AppProvider = ({ children }) => {
     setDailyActivity((prev) => {
       const target = (prev.trainingLogs || []).find((t) => t.id === id);
       const deduct = target ? Number(target.calories) || 0 : 0;
+      const nextLogs = (prev.trainingLogs || []).filter((t) => t.id !== id);
       return {
         ...prev,
         caloriesBurned: Math.max(0, (Number(prev.caloriesBurned) || 0) - deduct),
-        trainingLogs: (prev.trainingLogs || []).filter((t) => t.id !== id),
+        trainingLogs: nextLogs,
+        recoveryTelemetry: computeRecoveryTelemetry(nextLogs),
       };
     });
   };
@@ -688,24 +1004,7 @@ export const AppProvider = ({ children }) => {
       peptidesLogged: peptideHistory.slice(0, 5),
     };
     setHistoricalLogs((prev) => [snapshot, ...prev]);
-    setDailyNutrition((prev) => ({
-      ...INITIAL_NUTRITION,
-      targetCalories: prev.targetCalories,
-      targetProtein: prev.targetProtein,
-      targetCarbs: prev.targetCarbs,
-      targetFiber: prev.targetFiber,
-      targetFats: prev.targetFats,
-      targets: prev.targets,
-    }));
-    setDailyHydration((prev) => ({
-      ...INITIAL_HYDRATION,
-      targetMl: prev.targetMl,
-    }));
-    setDailyActivity((prev) => ({
-      ...INITIAL_ACTIVITY,
-      scheduledDates: prev.scheduledDates,
-      completedDates: prev.completedDates,
-    }));
+    resetDailySupplementsAndAminosAtMidnight();
     executePersistentSync('manual');
   };
 
@@ -716,6 +1015,7 @@ export const AppProvider = ({ children }) => {
         setUserProfile,
         dailyNutrition,
         setDailyNutrition,
+        updateMealInDaily,
         dailyHydration,
         setDailyHydration,
         dailyActivity,
@@ -730,15 +1030,23 @@ export const AppProvider = ({ children }) => {
         updatePeptideEntry,
         deletePeptideEntry,
         addTrainingSession,
+        updateTrainingSession,
         deleteTrainingSession,
         toggleCalendarDateStatus,
         historicalLogs,
         setHistoricalLogs,
+        updateHistoricalLog,
         mtorState,
         logStackToDaily,
         archiveDailyLog,
+        resetDailySupplementsAndAminosAtMidnight,
         isScannerOpen,
         setIsScannerOpen,
+        scannerTargetMode,
+        setScannerTargetMode,
+        stackScanCallbackRef,
+        openScannerForStack,
+        openScannerForDaily,
         syncStatusBadge,
         lastSyncedAt,
         executePersistentSync,

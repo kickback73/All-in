@@ -10,6 +10,7 @@ import {
   X,
   Search,
   Edit2,
+  Camera,
 } from 'lucide-react';
 import { ESSENTIAL_AMINO_ACIDS, MICRONUTRIENT_FIELDS } from '../data/initialData';
 import {
@@ -18,6 +19,7 @@ import {
   scaleNutrients,
 } from '../utils/nutrientEngine';
 import { TILE_BACKGROUNDS } from '../utils/backgroundEngine';
+import { useAppContext } from '../context/AppContext';
 import PersistentAllowanceChart from './PersistentAllowanceChart';
 
 export const STACK_CATEGORIES = [
@@ -121,6 +123,8 @@ export default function StackManager({
   onLogStack,
   onClose,
 }) {
+  const { openScannerForStack } = useAppContext();
+
   const [selectedCategory, setSelectedCategory] = useState('Morning Stacks');
   const [editingStackId, setEditingStackId] = useState(null);
   const [stackName, setStackName] = useState('');
@@ -150,6 +154,50 @@ export default function StackManager({
 
   if (!isOpen) return null;
 
+  // Native UPC Barcode Scanner integration for the Stack tab
+  const handleScanUpcIntoStack = (targetIngId = null) => {
+    openScannerForStack((scannedProduct) => {
+      if (!scannedProduct) return;
+      const newEntry = {
+        ...createEmptyIngredient(),
+        name: scannedProduct.productName || 'Scanned Product',
+        servingGrams: `${scannedProduct.servingGrams || 100}g`,
+        source: scannedProduct.source || 'Open Food Facts UPC',
+        calories: Number(scannedProduct.calories) || 0,
+        protein: Number(scannedProduct.protein) || 0,
+        carbs: Number(scannedProduct.carbs) || 0,
+        fiber: Number(scannedProduct.fiber) || 0,
+        netCarbs: Number(scannedProduct.netCarbs) || 0,
+        fats: Number(scannedProduct.fats) || 0,
+        waterMl: Number(scannedProduct.waterMl) || 0,
+        micros: {
+          ...createEmptyMicros(),
+          ...(scannedProduct.micros || {}),
+        },
+        aminos: {
+          ...createEmptyIngredient().aminos,
+          ...(scannedProduct.aminos || {}),
+        },
+      };
+
+      setIngredients((prev) => {
+        if (targetIngId) {
+          return prev.map((item) =>
+            item.id === targetIngId ? { ...newEntry, id: targetIngId } : item
+          );
+        }
+        // Replace first empty ingredient row if blank, otherwise append
+        const firstBlankIdx = prev.findIndex((item) => !item.name.trim());
+        if (firstBlankIdx !== -1) {
+          return prev.map((item, idx) =>
+            idx === firstBlankIdx ? { ...newEntry, id: item.id } : item
+          );
+        }
+        return [...prev, newEntry];
+      });
+    });
+  };
+
   const handleAutoPopulateIngredient = async (ing) => {
     if (!ing.name.trim()) return;
     setLoadingIngId(ing.id);
@@ -163,7 +211,7 @@ export default function StackManager({
             ? {
                 ...item,
                 ...verified,
-                id: ing.id, // Strictly preserve unique ID
+                id: ing.id,
                 servingGrams: verified.servingInputText || `${verified.servingGrams}g`,
               }
             : item
@@ -190,7 +238,7 @@ export default function StackManager({
     );
   };
 
-  // Strictly remove ONLY the targeted item by unique ID (fixes the last-two-items deletion bug)
+  // Strictly remove ONLY the targeted item by unique ID
   const handleRemoveIngredient = (targetId) => {
     setIngredients((prev) => {
       const filtered = prev.filter((item) => item.id !== targetId);
@@ -233,7 +281,6 @@ export default function StackManager({
     setSelectedCategory(cat);
     setScheduledHour(stack.scheduledHour || '07:30');
     setIsRecurringPlanned(stack.isRecurringPlanned !== false);
-    // Assign guaranteed unique IDs per ingredient row so deleting any row only deletes that exact row
     setIngredients(
       Array.isArray(stack.ingredients) && stack.ingredients.length > 0
         ? stack.ingredients.map((i) => ({
@@ -289,7 +336,7 @@ export default function StackManager({
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950/45 via-slate-950/55 to-slate-950/75 pointer-events-none" />
 
         {/* Top Header */}
-        <div className="relative z-10 px-4 py-3.5 bg-slate-950/65 backdrop-blur-md border-b border-white/20 flex items-center justify-between">
+        <div className="relative z-10 px-4 py-3.5 bg-slate-950/65 backdrop-blur-md border-b border-white/20 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="p-2 rounded-2xl bg-amber-500/25 border border-amber-400/50 text-amber-300 shrink-0">
               <Layers className="w-4 h-4" />
@@ -299,19 +346,30 @@ export default function StackManager({
                 {editingStackId ? 'Edit Stack — Get Stacked' : 'Get Stacked — Multi-Stack Builder'}
               </h2>
               <p className="text-[11px] text-slate-200 truncate">
-                Morning, Afternoon &amp; Evening Stacks • Auto-Verified Nutrients
+                Morning, Afternoon &amp; Evening Stacks • UPC Scanner &amp; Verified Nutrients
               </p>
             </div>
           </div>
-          {onClose && (
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white transition shrink-0"
+              onClick={() => handleScanUpcIntoStack(null)}
+              className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-black flex items-center gap-1 shadow-xs"
+              title="Scan a product UPC barcode directly into this stack"
             >
-              <X className="w-5 h-5" />
+              <Camera className="w-3.5 h-3.5" />
+              <span>Scan UPC</span>
             </button>
-          )}
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white transition shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="relative z-10 p-4 overflow-y-auto space-y-4">
@@ -358,7 +416,7 @@ export default function StackManager({
 
               {(categorizedStacks[selectedCategory] || []).length === 0 ? (
                 <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-3 text-center text-xs text-slate-400">
-                  No stacks saved in {selectedCategory} yet. Build one below!
+                  No stacks saved in {selectedCategory} yet. Build or scan one below!
                 </div>
               ) : (
                 (categorizedStacks[selectedCategory] || []).map((s) => (
@@ -504,15 +562,26 @@ export default function StackManager({
                     <span className="text-[11px] font-black uppercase text-amber-300">
                       Ingredient #{idx + 1}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveIngredient(ing.id)}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 text-[10px] font-bold transition"
-                      title="Delete strictly this ingredient"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Remove</span>
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleScanUpcIntoStack(ing.id)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/40 text-amber-200 text-[10px] font-bold transition"
+                        title="Scan UPC Barcode for this ingredient"
+                      >
+                        <Camera className="w-3 h-3" />
+                        <span>Scan UPC</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveIngredient(ing.id)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 text-[10px] font-bold transition"
+                        title="Delete strictly this ingredient"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Remove</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Contained Ingredient Search + Flexible Serving Input + Enter / Lookup Button */}
@@ -557,7 +626,7 @@ export default function StackManager({
                       title="Lookup and auto-populate verified USDA nutrients"
                     >
                       <Search className="w-3 h-3 shrink-0" />
-                      <span className=" whitespace-nowrap">
+                      <span className="whitespace-nowrap">
                         {loadingIngId === ing.id ? '...' : 'Enter / Lookup'}
                       </span>
                     </button>
@@ -649,15 +718,25 @@ export default function StackManager({
               ))}
             </div>
 
-            <div className="flex items-center justify-between gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setIngredients((prev) => [...prev, createEmptyIngredient()])}
-                className="px-3.5 py-2 rounded-full text-xs font-extrabold text-amber-300 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/30 transition flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Ingredient</span>
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIngredients((prev) => [...prev, createEmptyIngredient()])}
+                  className="px-3 py-2 rounded-full text-xs font-extrabold text-amber-300 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/30 transition flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Ingredient</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleScanUpcIntoStack(null)}
+                  className="px-3 py-2 rounded-full text-xs font-extrabold text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 transition flex items-center gap-1"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Scan UPC to Stack</span>
+                </button>
+              </div>
               <button
                 type="submit"
                 className="px-5 py-2 rounded-full text-xs font-extrabold text-slate-950 bg-amber-500 hover:bg-amber-400 shadow-sm transition flex items-center gap-1.5"

@@ -15,6 +15,8 @@ import {
   Sparkles,
   Mail,
   Sliders,
+  Edit2,
+  FileText,
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { MICRONUTRIENT_FIELDS } from '../data/initialData';
@@ -43,6 +45,7 @@ export default function UserProfileModal({ isOpen, onClose }) {
     setDailyHydration,
     historicalLogs,
     setHistoricalLogs,
+    updateHistoricalLog,
     archiveDailyLog,
     executePersistentSync,
   } = useAppContext();
@@ -50,9 +53,21 @@ export default function UserProfileModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'limits' | 'improvement' | 'history'
   const [savedNotice, setSavedNotice] = useState('');
   const [improvementNotes, setImprovementNotes] = useState('');
+  const [generatedSummaryPreview, setGeneratedSummaryPreview] = useState('');
   const [generatedPromptPreview, setGeneratedPromptPreview] = useState('');
   const [notifStatus, setNotifStatus] = useState(() => getNotificationPermissionState());
   const fileInputRef = useRef(null);
+
+  // Inline editing state for Historical Logs tab (Item 5)
+  const [editingLogId, setEditingLogId] = useState(null);
+  const [editLogForm, setEditLogForm] = useState({
+    date: '',
+    weightLbs: '',
+    calories: '',
+    protein: '',
+    currentMl: '',
+    caloriesBurned: '',
+  });
 
   if (!isOpen) return null;
 
@@ -129,32 +144,83 @@ export default function UserProfileModal({ isOpen, onClose }) {
     }));
   };
 
-  // Formulate Antigravity Improvement Prompt & Trigger Email to thekernyas@gmal.com
+  // Start editing a historical log row inline
+  const handleStartEditHistoricalLog = (log) => {
+    setEditingLogId(log.id);
+    setEditLogForm({
+      date: log.date || '',
+      weightLbs: String(log.weightLbs ?? userProfile.weightLbs ?? 229),
+      calories: String(log.nutrition?.calories ?? 0),
+      protein: String(log.nutrition?.protein ?? 0),
+      currentMl: String(log.hydration?.currentMl ?? 0),
+      caloriesBurned: String(log.activity?.caloriesBurned ?? 0),
+    });
+  };
+
+  const handleSaveHistoricalLogEdit = (logId) => {
+    if (typeof updateHistoricalLog === 'function') {
+      updateHistoricalLog(logId, {
+        date: editLogForm.date,
+        weightLbs: Number(editLogForm.weightLbs) || 0,
+        calories: Number(editLogForm.calories) || 0,
+        protein: Number(editLogForm.protein) || 0,
+        currentMl: Number(editLogForm.currentMl) || 0,
+        caloriesBurned: Number(editLogForm.caloriesBurned) || 0,
+      });
+    }
+    setEditingLogId(null);
+    setSavedNotice('Historical log updated!');
+    setTimeout(() => setSavedNotice(''), 1800);
+  };
+
+  // Item 7: Simultaneously compile a structured Request Summary alongside the generated Antigravity Prompt format
   const handleTriggerImprovementEmail = () => {
-    const userFeedback = improvementNotes.trim() ||
+    const userFeedback =
+      improvementNotes.trim() ||
       'Enhance UI responsiveness, refine daily nutritional and peptide tracking workflows, and optimize mobile Pixel 8 ergonomics.';
 
+    const bulletLines = userFeedback
+      .split(/\n+/)
+      .map((line) => line.replace(/^[-*•\d.)\s]+/, '').trim())
+      .filter(Boolean);
+
+    const structuredRequestSummary = [
+      '=== EXECUTIVE REQUEST SUMMARY ===',
+      `Timestamp: ${new Date().toLocaleString()}`,
+      `Athlete: ${userProfile.name} (${userProfile.weightLbs} lbs -> Goal ${userProfile.goalWeightLbs} lbs)`,
+      `Protocol & Guardrail: ${userProfile.activeProtocol} | ${userProfile.remissionStatus}`,
+      `Total Action Items: ${bulletLines.length}`,
+      'Key Objectives:',
+      ...bulletLines.map((item, idx) => `  ${idx + 1}. ${item}`),
+    ].join('\n');
+
     const formulatedAntigravityPrompt = [
-      'Refactor and update the All-In web application strictly according to the following improvement specification:',
+      '### Refactoring & Feature Expansion Specification: All-In Web Application',
       '',
-      '### User Feedback & Improvement Request:',
-      userFeedback,
+      '#### Objective',
+      'Update the All-In web application UI and state management according to the following specifications while strictly preserving existing layout structures, navigation pathways, and NHL remission safety rules.',
       '',
-      '### Current Athlete Profile & Daily Allowance Context:',
+      '#### Detailed Change List',
+      ...bulletLines.map((item, idx) => `${idx + 1}. ${item}`),
+      '',
+      '#### Athlete Profile & Daily Allowance Context',
       `- Athlete: ${userProfile.name} (${userProfile.sex}, Age ${userProfile.age || 53}, ${userProfile.height}, ${userProfile.weightLbs} lbs -> Goal ${userProfile.goalWeightLbs} lbs)`,
       `- Daily Allowances: ${dailyNutrition.targetCalories} kcal | ${dailyNutrition.targetProtein}g Protein | ${dailyNutrition.targetCarbs}g Carbs | ${dailyNutrition.targetFiber}g Fiber | ${dailyNutrition.targetFats}g Fats | ${dailyHydration.targetMl}ml Water`,
       `- Active Protocol: ${userProfile.activeProtocol} (${userProfile.remissionStatus})`,
       '',
-      '### Execution Constraints:',
-      '- Preserve all existing layouts, navigation structures, and NHL remission safety rules outside of the requested changes.',
-      '- Run production build (`npm run build`) and push live to Vercel (`origin/main`).',
+      '#### Deployment & Verification',
+      '- Run a full production build (`npm run build`) to verify zero compilation or runtime errors.',
+      '- Commit and push all updates directly to the main branch to trigger automatic Vercel deployment.',
     ].join('\n');
 
+    const combinedDispatchPayload = `${structuredRequestSummary}\n\n----------------------------------------\n\n${formulatedAntigravityPrompt}`;
+
+    setGeneratedSummaryPreview(structuredRequestSummary);
     setGeneratedPromptPreview(formulatedAntigravityPrompt);
 
     try {
       if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(formulatedAntigravityPrompt).catch(() => {});
+        navigator.clipboard.writeText(combinedDispatchPayload).catch(() => {});
       }
     } catch {
       // Ignore clipboard permission errors
@@ -166,11 +232,11 @@ export default function UserProfileModal({ isOpen, onClose }) {
     const mailtoUrl = `mailto:${recipient}?cc=${encodeURIComponent(
       ccRecipient
     )}&subject=${encodeURIComponent(exactSubject)}&body=${encodeURIComponent(
-      formulatedAntigravityPrompt
+      combinedDispatchPayload
     )}`;
 
     window.location.href = mailtoUrl;
-    setSavedNotice('Antigravity Improvement Prompt formulated & email client triggered!');
+    setSavedNotice('Request Summary + Antigravity Prompt compiled & dispatched!');
     setTimeout(() => setSavedNotice(''), 3000);
   };
 
@@ -651,7 +717,7 @@ export default function UserProfileModal({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* TAB 3: "IMPROVEMENT" BUTTON & AUTOMATED ANTIGRAVITY EMAIL PROMPT */}
+          {/* TAB 3: "IMPROVEMENT" GENERATOR (Simultaneous Request Summary + Antigravity Prompt) */}
           {activeTab === 'improvement' && (
             <div className="rounded-2xl bg-slate-950/65 backdrop-blur-md border border-amber-400/40 p-3.5 space-y-3">
               <div className="flex items-center gap-2">
@@ -660,7 +726,7 @@ export default function UserProfileModal({ isOpen, onClose }) {
                 </div>
                 <div>
                   <h3 className="text-xs font-black uppercase text-white">
-                    Antigravity Improvement Prompt Generator
+                    Antigravity Improvement Prompt &amp; Summary Generator
                   </h3>
                   <p className="text-[10px] text-slate-300">
                     Dispatches to <strong>thekernyas@gmal.com</strong> • Subject: <strong>All-In improvment Prompt</strong>
@@ -676,7 +742,7 @@ export default function UserProfileModal({ isOpen, onClose }) {
                   rows={4}
                   value={improvementNotes}
                   onChange={(e) => setImprovementNotes(e.target.value)}
-                  placeholder="Describe any UI tweaks, new calculators, stack adjustments, or features you want formulated into an Antigravity prompt..."
+                  placeholder="Describe any UI tweaks, new calculators, stack adjustments, or features you want compiled into a Request Summary + Antigravity Prompt..."
                   className="w-full rounded-xl border border-white/20 bg-slate-950/85 p-2.5 text-xs font-medium text-white"
                 />
               </div>
@@ -687,13 +753,25 @@ export default function UserProfileModal({ isOpen, onClose }) {
                 className="w-full py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 shadow-lg transition"
               >
                 <Mail className="w-4 h-4" />
-                <span>Improvement — Generate Prompt &amp; Email</span>
+                <span>Compile Summary + Antigravity Prompt &amp; Email</span>
               </button>
+
+              {generatedSummaryPreview && (
+                <div className="space-y-1">
+                  <span className="text-[9px] font-black uppercase text-cyan-300 flex items-center gap-1">
+                    <FileText className="w-3 h-3" />
+                    <span>1. Structured Request Summary:</span>
+                  </span>
+                  <pre className="text-[10px] font-mono text-cyan-100 bg-slate-950/90 border border-cyan-500/30 rounded-xl p-2.5 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                    {generatedSummaryPreview}
+                  </pre>
+                </div>
+              )}
 
               {generatedPromptPreview && (
                 <div className="space-y-1">
                   <span className="text-[9px] font-black uppercase text-emerald-300 block">
-                    ✓ Formulated Antigravity Prompt (Copied to Clipboard &amp; Sent to Mail Client):
+                    ✓ 2. Formulated Antigravity Prompt (Copied &amp; Sent to Mail Client):
                   </span>
                   <pre className="text-[10px] font-mono text-slate-200 bg-black/70 border border-white/15 rounded-xl p-2.5 whitespace-pre-wrap max-h-40 overflow-y-auto">
                     {generatedPromptPreview}
@@ -703,7 +781,7 @@ export default function UserProfileModal({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* TAB 4: HISTORICAL LOGS */}
+          {/* TAB 4: HISTORICAL LOGS WITH INLINE PENCIL EDIT & DELETE CONTROLS */}
           {activeTab === 'history' && (
             <div className="space-y-2.5">
               {historicalLogs.length === 0 ? (
@@ -711,61 +789,185 @@ export default function UserProfileModal({ isOpen, onClose }) {
                   No archived daily snapshots yet. Automatic sync runs on launch and every midnight (`00:00:00`).
                 </div>
               ) : (
-                historicalLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className="rounded-2xl border border-white/20 p-3 bg-slate-950/65 backdrop-blur-md space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-white flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-cyan-400" />
-                        {log.date}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-bold text-slate-200">
-                          {log.weightLbs} lbs
+                historicalLogs.map((log) => {
+                  const isEditingThis = editingLogId === log.id;
+                  return (
+                    <div
+                      key={log.id}
+                      className="rounded-2xl border border-white/20 p-3 bg-slate-950/65 backdrop-blur-md space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-white flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+                          {log.date}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setHistoricalLogs((prev) =>
-                              prev.filter((item) => item.id !== log.id)
-                            )
-                          }
-                          className="text-rose-400 hover:text-rose-300"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-bold text-slate-200 mr-1">
+                            {log.weightLbs} lbs
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              isEditingThis
+                                ? setEditingLogId(null)
+                                : handleStartEditHistoricalLog(log)
+                            }
+                            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-cyan-300 transition"
+                            title="Edit Historical Log Row"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setHistoricalLogs((prev) =>
+                                prev.filter((item) => item.id !== log.id)
+                              )
+                            }
+                            className="p-1.5 rounded-lg bg-white/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition"
+                            title="Delete Historical Log Row"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
+
+                      {isEditingThis ? (
+                        <div className="rounded-xl bg-slate-900/90 border border-cyan-400/40 p-2.5 space-y-2">
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <div>
+                              <label className="block text-[8px] font-bold uppercase text-slate-400">
+                                Date
+                              </label>
+                              <input
+                                type="text"
+                                value={editLogForm.date}
+                                onChange={(e) =>
+                                  setEditLogForm((p) => ({ ...p, date: e.target.value }))
+                                }
+                                className="w-full rounded-lg bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[8px] font-bold uppercase text-slate-400">
+                                Weight (lbs)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.5"
+                                value={editLogForm.weightLbs}
+                                onChange={(e) =>
+                                  setEditLogForm((p) => ({ ...p, weightLbs: e.target.value }))
+                                }
+                                className="w-full rounded-lg bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[8px] font-bold uppercase text-slate-400">
+                                Kcal
+                              </label>
+                              <input
+                                type="number"
+                                value={editLogForm.calories}
+                                onChange={(e) =>
+                                  setEditLogForm((p) => ({ ...p, calories: e.target.value }))
+                                }
+                                className="w-full rounded-lg bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[8px] font-bold uppercase text-slate-400">
+                                Protein (g)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={editLogForm.protein}
+                                onChange={(e) =>
+                                  setEditLogForm((p) => ({ ...p, protein: e.target.value }))
+                                }
+                                className="w-full rounded-lg bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-emerald-300"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[8px] font-bold uppercase text-slate-400">
+                                Water (ml)
+                              </label>
+                              <input
+                                type="number"
+                                value={editLogForm.currentMl}
+                                onChange={(e) =>
+                                  setEditLogForm((p) => ({ ...p, currentMl: e.target.value }))
+                                }
+                                className="w-full rounded-lg bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-cyan-300"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[8px] font-bold uppercase text-slate-400">
+                                Burned (kcal)
+                              </label>
+                              <input
+                                type="number"
+                                value={editLogForm.caloriesBurned}
+                                onChange={(e) =>
+                                  setEditLogForm((p) => ({
+                                    ...p,
+                                    caloriesBurned: e.target.value,
+                                  }))
+                                }
+                                className="w-full rounded-lg bg-slate-950 border border-white/15 px-1.5 py-1 text-[10px] font-bold text-indigo-300"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setEditingLogId(null)}
+                              className="px-2.5 py-1 rounded-lg bg-white/10 text-[10px] font-bold text-slate-300"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveHistoricalLogEdit(log.id)}
+                              className="px-2.5 py-1 rounded-lg bg-cyan-400 text-slate-950 text-[10px] font-black flex items-center gap-1"
+                            >
+                              <Save className="w-3 h-3" />
+                              <span>Save Edit</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-4 gap-1.5 text-center text-[10px]">
+                          <div className="bg-black/60 rounded-lg p-1 border border-white/10">
+                            <div className="text-slate-400 font-bold">Kcal</div>
+                            <div className="font-black text-white">
+                              {log.nutrition?.calories || 0}
+                            </div>
+                          </div>
+                          <div className="bg-black/60 rounded-lg p-1 border border-white/10">
+                            <div className="text-slate-400 font-bold">Protein</div>
+                            <div className="font-black text-emerald-400">
+                              {log.nutrition?.protein || 0}g
+                            </div>
+                          </div>
+                          <div className="bg-black/60 rounded-lg p-1 border border-white/10">
+                            <div className="text-slate-400 font-bold">Water</div>
+                            <div className="font-black text-cyan-300">
+                              {log.hydration?.currentMl || 0}ml
+                            </div>
+                          </div>
+                          <div className="bg-black/60 rounded-lg p-1 border border-white/10">
+                            <div className="text-slate-400 font-bold">Burned</div>
+                            <div className="font-black text-indigo-300">
+                              {log.activity?.caloriesBurned || 0} kcal
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="grid grid-cols-4 gap-1.5 text-center text-[10px]">
-                      <div className="bg-black/60 rounded-lg p-1 border border-white/10">
-                        <div className="text-slate-400 font-bold">Kcal</div>
-                        <div className="font-black text-white">
-                          {log.nutrition?.calories || 0}
-                        </div>
-                      </div>
-                      <div className="bg-black/60 rounded-lg p-1 border border-white/10">
-                        <div className="text-slate-400 font-bold">Protein</div>
-                        <div className="font-black text-emerald-400">
-                          {log.nutrition?.protein || 0}g
-                        </div>
-                      </div>
-                      <div className="bg-black/60 rounded-lg p-1 border border-white/10">
-                        <div className="text-slate-400 font-bold">Water</div>
-                        <div className="font-black text-cyan-300">
-                          {log.hydration?.currentMl || 0}ml
-                        </div>
-                      </div>
-                      <div className="bg-black/60 rounded-lg p-1 border border-white/10">
-                        <div className="text-slate-400 font-bold">Burned</div>
-                        <div className="font-black text-indigo-300">
-                          {log.activity?.caloriesBurned || 0} kcal
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           )}

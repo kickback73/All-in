@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Sparkles,
   Search,
+  Layers,
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useAppContext } from '../context/AppContext';
@@ -15,13 +16,21 @@ import { lookupUpcBarcode } from '../utils/nutrientEngine';
 import { TILE_BACKGROUNDS } from '../utils/backgroundEngine';
 
 export default function BarcodeScannerModal() {
-  const { isScannerOpen, setIsScannerOpen, logStackToDaily } = useAppContext();
+  const {
+    isScannerOpen,
+    setIsScannerOpen,
+    logStackToDaily,
+    scannerTargetMode,
+    setScannerTargetMode,
+    stackScanCallbackRef,
+  } = useAppContext();
 
   const [manualUpc, setManualUpc] = useState('');
   const [scannedProduct, setScannedProduct] = useState(null);
   const [scannerError, setScannerError] = useState(null);
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [loggedSuccess, setLoggedSuccess] = useState(false);
+  const [stackAddedSuccess, setStackAddedSuccess] = useState(false);
 
   const html5QrCodeRef = useRef(null);
   const scannerContainerId = 'allin-upc-camera-viewport';
@@ -105,7 +114,7 @@ export default function BarcodeScannerModal() {
     }
   };
 
-  const handleConfirmLog = () => {
+  const handleConfirmLogToDaily = () => {
     if (!scannedProduct) return;
     logStackToDaily(scannedProduct, scannedProduct.productName);
     setLoggedSuccess(true);
@@ -115,7 +124,19 @@ export default function BarcodeScannerModal() {
     }, 800);
   };
 
-  // Closes ONLY the camera scanner modal overlay without closing or resetting the Nutrition tile
+  const handleAddToStack = () => {
+    if (!scannedProduct) return;
+    if (typeof stackScanCallbackRef?.current === 'function') {
+      stackScanCallbackRef.current(scannedProduct);
+    }
+    setStackAddedSuccess(true);
+    setTimeout(() => {
+      setStackAddedSuccess(false);
+      handleCloseScannerOnly();
+    }, 700);
+  };
+
+  // Closes ONLY the camera scanner modal overlay without closing or resetting the underlying tile
   const handleCloseScannerOnly = (e) => {
     if (e) e.stopPropagation();
     stopCameraScanner();
@@ -123,9 +144,13 @@ export default function BarcodeScannerModal() {
     setManualUpc('');
     setScannerError(null);
     setIsScannerOpen(false);
+    if (setScannerTargetMode) setScannerTargetMode('daily');
+    if (stackScanCallbackRef) stackScanCallbackRef.current = null;
   };
 
   if (!isScannerOpen) return null;
+
+  const isStackMode = scannerTargetMode === 'stack';
 
   return (
     <div
@@ -137,7 +162,7 @@ export default function BarcodeScannerModal() {
         className="relative bg-slate-950 border border-white/15 rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden text-white"
       >
         <img
-          src={TILE_BACKGROUNDS.nutrition}
+          src={isStackMode ? TILE_BACKGROUNDS.stacks : TILE_BACKGROUNDS.nutrition}
           alt="Scanner Backdrop"
           className="absolute inset-0 w-full h-full object-cover object-center opacity-20 pointer-events-none"
         />
@@ -151,17 +176,21 @@ export default function BarcodeScannerModal() {
             </div>
             <div>
               <h3 className="text-xs font-black uppercase tracking-wider text-white">
-                UPC / EAN Barcode Camera Scanner
+                {isStackMode
+                  ? 'Stack Builder — UPC Barcode Scanner'
+                  : 'UPC / EAN Barcode Camera Scanner'}
               </h3>
               <p className="text-[10px] text-slate-400">
-                Open Food Facts API v2 • Returns directly to Nutrition
+                {isStackMode
+                  ? 'Scan product directly into your Stack or Daily Log'
+                  : 'Open Food Facts API v2 • Returns directly to Nutrition'}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={handleCloseScannerOnly}
-            title="Close Camera Scanner (Stay in Nutrition)"
+            title="Close Camera Scanner"
             className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition"
           >
             <X className="w-4 h-4" />
@@ -271,23 +300,45 @@ export default function BarcodeScannerModal() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleConfirmLog}
-                className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg transition"
-              >
-                {loggedSuccess ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Auto-Populated into Today&apos;s Nutrition Log!</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>Auto-Populate Today&apos;s Nutrition Log</span>
-                  </>
+              <div className="space-y-1.5">
+                {isStackMode && (
+                  <button
+                    type="button"
+                    onClick={handleAddToStack}
+                    className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg transition"
+                  >
+                    {stackAddedSuccess ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Added to Active Stack!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Layers className="w-4 h-4" />
+                        <span>Add Scanned Product to Current Stack</span>
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmLogToDaily}
+                  className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg transition"
+                >
+                  {loggedSuccess ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Auto-Populated into Today&apos;s Nutrition Log!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      <span>Log Directly to Today&apos;s Daily Totals</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           )}
         </div>

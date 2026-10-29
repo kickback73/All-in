@@ -6,175 +6,95 @@ import { MICRONUTRIENT_FIELDS } from '../data/initialData';
 import { resolvePeptideAminoSynergy, lookupVerifiedNutrients } from '../utils/nutrientEngine';
 
 /**
- * Individual SVG Radial Circle / Doughnut Gauge for a single Macro metric
+ * Clean Numerical Readout & Structured Data Table for Macronutrients (Item 4: Circle meters removed)
  */
-const SingleMacroCircleGauge = ({
-  label,
-  logged,
-  target,
-  unit,
-  strokeColor,
-  textColor,
-  subLabel,
-  size = 68,
-}) => {
-  const pct = Math.min(100, Math.round((logged / Math.max(1, target)) * 100));
-  const strokeWidth = 6;
-  const radius = (size - strokeWidth * 2) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const dashLen = (pct / 100) * circumference;
-
+const MacroNumericalDataTable = ({ macroRows, netCarbs = 0 }) => {
   return (
-    <div className="rounded-xl bg-slate-950/75 border border-white/15 p-2 flex flex-col items-center text-center">
-      <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="transparent"
-            stroke="rgba(255,255,255,0.12)"
-            strokeWidth={strokeWidth}
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="transparent"
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={`${dashLen} ${circumference}`}
-            strokeDashoffset={0}
-            className="transition-all duration-500"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-          <span className="text-[11px] font-black text-white">{pct}%</span>
-          <span className={`text-[8px] font-mono font-bold ${textColor} mt-0.5`}>
-            {logged}
-            {unit}
-          </span>
-        </div>
-      </div>
-      <div className="text-[10px] font-black text-white mt-1 truncate w-full">{label}</div>
-      <div className="text-[8px] font-mono font-bold text-slate-400">
-        Target: {target} {unit}
-      </div>
-      {subLabel && (
-        <div className="text-[8px] font-extrabold text-teal-300 mt-0.5">{subLabel}</div>
-      )}
-    </div>
-  );
-};
-
-/**
- * Multi-Segment Macro Distribution Circle / Doughnut Chart (Protein, Carbs, Fats caloric & gram split)
- */
-const MacroDistributionDoughnut = ({ protein, carbs, fats, calories, targetCalories }) => {
-  const protKcal = Math.max(0, Number(protein) * 4);
-  const carbKcal = Math.max(0, Number(carbs) * 4);
-  const fatKcal = Math.max(0, Number(fats) * 9);
-  const totalMacroKcal = protKcal + carbKcal + fatKcal;
-  const hasLogged = totalMacroKcal > 0;
-  const denom = Math.max(1, totalMacroKcal);
-
-  const protPct = hasLogged ? Math.round((protKcal / denom) * 100) : 40;
-  const carbPct = hasLogged ? Math.round((carbKcal / denom) * 100) : 30;
-  const fatPct = hasLogged ? Math.max(0, 100 - protPct - carbPct) : 30;
-
-  const size = 94;
-  const strokeWidth = 10;
-  const radius = (size - strokeWidth * 2) / 2;
-  const circumference = 2 * Math.PI * radius;
-
-  const protLen = (protPct / 100) * circumference;
-  const carbLen = (carbPct / 100) * circumference;
-  const fatLen = (fatPct / 100) * circumference;
-
-  return (
-    <div className="rounded-xl bg-slate-950/80 border border-emerald-400/30 p-2.5 flex items-center justify-between gap-3">
-      <div className="relative flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="transparent"
-            stroke="rgba(255,255,255,0.1)"
-            strokeWidth={strokeWidth}
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="transparent"
-            stroke="#10b981"
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${protLen} ${circumference}`}
-            strokeDashoffset={0}
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="transparent"
-            stroke="#06b6d4"
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${carbLen} ${circumference}`}
-            strokeDashoffset={-protLen}
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="transparent"
-            stroke="#f59e0b"
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${fatLen} ${circumference}`}
-            strokeDashoffset={-(protLen + carbLen)}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center leading-tight">
-          <span className="text-xs font-black text-white">{calories}</span>
-          <span className="text-[8px] font-bold text-slate-400">/ {targetCalories} kcal</span>
-        </div>
+    <div className="space-y-2.5">
+      {/* Top Scannable Numerical Summary Readout Cards */}
+      <div className="grid grid-cols-3 gap-1.5">
+        {macroRows.map((m) => {
+          const pct = Math.min(999, Math.round((m.logged / Math.max(1, m.target)) * 100));
+          return (
+            <div
+              key={m.key}
+              className="rounded-xl bg-slate-950/85 border border-white/15 px-2.5 py-2 flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[9px] font-extrabold uppercase text-slate-300 truncate">
+                  {m.label}
+                </span>
+                <span className={`text-[9px] font-mono font-black ${m.text}`}>{pct}%</span>
+              </div>
+              <div className="mt-1 flex items-baseline justify-between gap-1">
+                <span className="text-xs font-black text-white font-mono">
+                  {m.logged}
+                  <span className="text-[9px] font-bold text-slate-400 ml-0.5">{m.unit}</span>
+                </span>
+                <span className="text-[9px] font-mono text-slate-400">
+                  / {m.target}
+                  {m.unit}
+                </span>
+              </div>
+              {m.subLabel && (
+                <div className="text-[8px] font-extrabold text-teal-300 mt-0.5">{m.subLabel}</div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      <div className="flex-1 space-y-1.5 min-w-0">
-        <div className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
-          Macro Distribution Doughnut
-        </div>
-        <div className="space-y-1 text-[10px]">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 font-bold text-slate-200">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-              Protein ({protein}g)
-            </span>
-            <span className="font-mono font-black text-emerald-300">{protPct}% kcal</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 font-bold text-slate-200">
-              <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block" />
-              Carbs ({carbs}g)
-            </span>
-            <span className="font-mono font-black text-cyan-300">{carbPct}% kcal</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 font-bold text-slate-200">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
-              Fats ({fats}g)
-            </span>
-            <span className="font-mono font-black text-amber-300">{fatPct}% kcal</span>
-          </div>
-        </div>
+      {/* Structured Macronutrient Allowance Data Table */}
+      <div className="rounded-xl bg-slate-950/90 border border-white/15 overflow-hidden">
+        <table className="w-full text-left border-collapse text-[10px]">
+          <thead>
+            <tr className="bg-slate-900/95 border-b border-white/15 text-[9px] font-black uppercase tracking-wider text-slate-300">
+              <th className="py-1.5 px-2.5">Macro Metric</th>
+              <th className="py-1.5 px-2 text-right">Logged</th>
+              <th className="py-1.5 px-2 text-right">Target</th>
+              <th className="py-1.5 px-2 text-right">Remaining</th>
+              <th className="py-1.5 px-2.5 text-right">%</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/10 font-mono">
+            {macroRows.map((m) => {
+              const remaining = Math.max(0, Math.round((m.target - m.logged) * 10) / 10);
+              const pct = Math.min(999, Math.round((m.logged / Math.max(1, m.target)) * 100));
+              return (
+                <tr key={`row_${m.key}`} className="hover:bg-white/5">
+                  <td className="py-1.5 px-2.5 font-sans font-extrabold text-white">
+                    {m.label}
+                    {m.key === 'carbs' && (
+                      <span className="ml-1 text-[8px] font-bold text-teal-300">
+                        (Net {netCarbs}g)
+                      </span>
+                    )}
+                  </td>
+                  <td className={`py-1.5 px-2 text-right font-black ${m.text}`}>
+                    {m.logged}
+                    {m.unit}
+                  </td>
+                  <td className="py-1.5 px-2 text-right text-slate-300">
+                    {m.target}
+                    {m.unit}
+                  </td>
+                  <td className="py-1.5 px-2 text-right text-slate-400">
+                    {remaining}
+                    {m.unit}
+                  </td>
+                  <td className="py-1.5 px-2.5 text-right font-black text-white">{pct}%</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 };
 
 /**
- * SVG Spider / Radar Chart for 15 Expanded Vitamins & Minerals (Replaces bar lists in Micros tab)
+ * SVG Spider / Radar Chart for 15 Expanded Vitamins & Minerals (Micros tab)
  */
 const MicronutrientSpiderRadarChart = ({ microRows }) => {
   const size = 290;
@@ -214,7 +134,9 @@ const MicronutrientSpiderRadarChart = ({ microRows }) => {
     };
   });
 
-  const dataPolygonPoints = dataPoints.map((d) => `${d.pt.x.toFixed(1)},${d.pt.y.toFixed(1)}`).join(' ');
+  const dataPolygonPoints = dataPoints
+    .map((d) => `${d.pt.x.toFixed(1)},${d.pt.y.toFixed(1)}`)
+    .join(' ');
 
   return (
     <div className="space-y-2.5">
@@ -228,7 +150,8 @@ const MicronutrientSpiderRadarChart = ({ microRows }) => {
               <span className="w-2 h-0.5 bg-emerald-400 inline-block" /> 100% Target
             </span>
             <span className="flex items-center gap-1 text-amber-300">
-              <span className="w-2 h-2 rounded-full bg-amber-400/60 border border-amber-300 inline-block" /> Logged %
+              <span className="w-2 h-2 rounded-full bg-amber-400/60 border border-amber-300 inline-block" />{' '}
+              Logged %
             </span>
           </div>
         </div>
@@ -237,7 +160,6 @@ const MicronutrientSpiderRadarChart = ({ microRows }) => {
           viewBox={`0 0 ${size} ${size}`}
           className="w-full max-w-[290px] h-auto overflow-visible"
         >
-          {/* Concentric Web Polygons (25%, 50%, 75%, 100% Target Ring) */}
           {ringLevels.map((lvl) => {
             const pts = microRows
               .map((_, i) => {
@@ -258,7 +180,6 @@ const MicronutrientSpiderRadarChart = ({ microRows }) => {
             );
           })}
 
-          {/* Radial Spokes */}
           {dataPoints.map((d) => (
             <line
               key={`spoke_${d.key}`}
@@ -271,7 +192,6 @@ const MicronutrientSpiderRadarChart = ({ microRows }) => {
             />
           ))}
 
-          {/* Current Intake Spider Polygon */}
           <polygon
             points={dataPolygonPoints}
             fill="rgba(245, 158, 11, 0.30)"
@@ -279,10 +199,8 @@ const MicronutrientSpiderRadarChart = ({ microRows }) => {
             strokeWidth="2"
           />
 
-          {/* Vertex Dots & Perimeter Labels */}
           {dataPoints.map((d) => {
-            const dotColor =
-              d.pct >= 80 ? '#10b981' : d.pct >= 35 ? '#fbbf24' : '#38bdf8';
+            const dotColor = d.pct >= 80 ? '#10b981' : d.pct >= 35 ? '#fbbf24' : '#38bdf8';
             return (
               <g key={`vertex_${d.key}`}>
                 <circle
@@ -321,7 +239,7 @@ const MicronutrientSpiderRadarChart = ({ microRows }) => {
         </svg>
       </div>
 
-      {/* Compact 3-Column Vitamin & Mineral Value Chips (No linear bars) */}
+      {/* Compact 3-Column Vitamin & Mineral Numerical Value Readout */}
       <div className="grid grid-cols-3 gap-1.5">
         {dataPoints.map((m) => (
           <div
@@ -380,7 +298,6 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
     histidine: 900,
   };
 
-  // Resolve Active Peptide Synergy Profile for Amino Acid Prioritization & Food Suggestions
   const currentPeptide =
     activePeptideName || peptideHistory?.[0]?.peptideName || 'Retatrutide (GLP-1/GIP/GCGR)';
   const peptideSynergy = useMemo(
@@ -390,12 +307,19 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
 
   const macroRows = [
     {
+      key: 'calories',
+      label: 'Calories',
+      logged: Math.round(Number(dailyNutrition.calories) || 0),
+      target: Number(dailyNutrition.targetCalories) || 1900,
+      unit: 'kcal',
+      text: 'text-teal-300',
+    },
+    {
       key: 'protein',
       label: 'Protein',
       logged: Math.round((Number(dailyNutrition.protein) || 0) * 10) / 10,
       target: Number(dailyNutrition.targetProtein) || 180,
       unit: 'g',
-      strokeColor: '#10b981',
       text: 'text-emerald-300',
     },
     {
@@ -404,27 +328,8 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
       logged: Math.round((Number(dailyNutrition.carbs) || 0) * 10) / 10,
       target: Number(dailyNutrition.targetCarbs) || 140,
       unit: 'g',
-      strokeColor: '#06b6d4',
       text: 'text-cyan-300',
       subLabel: `Net: ${dailyNutrition.netCarbs || 0}g`,
-    },
-    {
-      key: 'fats',
-      label: 'Total Fats',
-      logged: Math.round((Number(dailyNutrition.fats) || 0) * 10) / 10,
-      target: Number(dailyNutrition.targetFats) || 65,
-      unit: 'g',
-      strokeColor: '#f59e0b',
-      text: 'text-amber-300',
-    },
-    {
-      key: 'calories',
-      label: 'Calories',
-      logged: Math.round(Number(dailyNutrition.calories) || 0),
-      target: Number(dailyNutrition.targetCalories) || 1900,
-      unit: 'kcal',
-      strokeColor: '#14b8a6',
-      text: 'text-teal-300',
     },
     {
       key: 'fiber',
@@ -432,8 +337,15 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
       logged: Math.round((Number(dailyNutrition.fiber) || 0) * 10) / 10,
       target: Number(dailyNutrition.targetFiber) || 32,
       unit: 'g',
-      strokeColor: '#a855f7',
       text: 'text-violet-300',
+    },
+    {
+      key: 'fats',
+      label: 'Total Fats',
+      logged: Math.round((Number(dailyNutrition.fats) || 0) * 10) / 10,
+      target: Number(dailyNutrition.targetFats) || 65,
+      unit: 'g',
+      text: 'text-amber-300',
     },
     {
       key: 'hydration',
@@ -441,24 +353,20 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
       logged: Math.round(Number(dailyHydration.currentMl) || 0),
       target: Number(dailyHydration.targetMl) || 3250,
       unit: 'ml',
-      strokeColor: '#38bdf8',
       text: 'text-sky-300',
     },
   ];
 
-  // Expanded 15 Micronutrients (8 Vitamins + 7 Minerals)
   const microRows = MICRONUTRIENT_FIELDS.map((field) => ({
     key: field.key,
     label: field.label,
     shortLabel: field.shortLabel || field.label,
-    logged:
-      Math.round((Number(dailyNutrition.micros?.[field.key]) || 0) * 10) / 10,
+    logged: Math.round((Number(dailyNutrition.micros?.[field.key]) || 0) * 10) / 10,
     target: Number(microTargets[field.key]) || field.defaultTarget,
     unit: field.unit,
     category: field.category,
   }));
 
-  // 9 Essential Amino Acids dynamically prioritized & sorted by Active Peptide Synergy
   const aminoRows = useMemo(() => {
     const baseAminos = [
       {
@@ -535,7 +443,7 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
       },
       {
         key: 'methionine',
-        label: 'Methionine (NHL Ceiling Guard)',
+        label: 'Methionine (NHL Ceiling)',
         logged: Math.round(Number(dailyNutrition.aminos?.methionine) || 0),
         target: Number(aminoTargets.methionine) || 1200,
         unit: 'mg',
@@ -568,7 +476,7 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
     }
   };
 
-  // Compact Persistent Comparison Chart shown at the top of non-Nutrition tiles
+  // Compact Persistent Numerical Readout Table shown at the top of opened tiles
   if (!showDetailedBreakdown) {
     return (
       <div className="rounded-2xl bg-slate-950/65 backdrop-blur-md border border-white/20 p-3 space-y-2 shadow-lg">
@@ -583,25 +491,33 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
         </div>
 
         <div className="grid grid-cols-3 gap-1.5">
-          {macroRows.slice(0, 6).map((m) => (
-            <SingleMacroCircleGauge
-              key={m.key}
-              label={m.label}
-              logged={m.logged}
-              target={m.target}
-              unit={m.unit}
-              strokeColor={m.strokeColor}
-              textColor={m.text}
-              size={52}
-            />
-          ))}
+          {macroRows.map((m) => {
+            const pct = Math.min(999, Math.round((m.logged / Math.max(1, m.target)) * 100));
+            return (
+              <div
+                key={m.key}
+                className="rounded-xl bg-black/55 border border-white/10 px-2 py-1.5 flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between text-[8px]">
+                  <span className="font-extrabold text-slate-300 uppercase truncate">
+                    {m.label}
+                  </span>
+                  <span className={`font-mono font-black ${m.text}`}>{pct}%</span>
+                </div>
+                <div className="text-[10px] font-mono font-black text-white mt-0.5 truncate">
+                  {m.logged} / {m.target}
+                  {m.unit}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
   }
 
   // Comprehensive Tabbed Breakdown Chart (For Nutrition Tile):
-  // - Macros: Circle / Doughnut Charts
+  // - Macros: Clean Numerical Readouts & Data Table (No circle progress meters)
   // - Micros: 15-Vitamin/Mineral Spider / Radar Chart
   // - Aminos: Peptide-Driven Prioritized Amino Acids & Synergistic Food Suggestions
   return (
@@ -628,7 +544,7 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
           }`}
         >
           <Flame className="w-3 h-3" />
-          <span>Macros (Circles)</span>
+          <span>Macros (Table)</span>
         </button>
         <button
           type="button"
@@ -656,32 +572,12 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
         </button>
       </div>
 
-      {/* TAB 1: MACRONUTRIENTS CIRCLE / DOUGHNUT CHARTS */}
+      {/* TAB 1: MACRONUTRIENTS CLEAN NUMERICAL READOUTS & DATA TABLE */}
       {detailSubTab === 'macros' && (
-        <div className="space-y-2.5">
-          <MacroDistributionDoughnut
-            protein={dailyNutrition.protein || 0}
-            carbs={dailyNutrition.carbs || 0}
-            fats={dailyNutrition.fats || 0}
-            calories={dailyNutrition.calories || 0}
-            targetCalories={dailyNutrition.targetCalories || 1900}
-          />
-          <div className="grid grid-cols-3 gap-2">
-            {macroRows.map((m) => (
-              <SingleMacroCircleGauge
-                key={m.key}
-                label={m.label}
-                logged={m.logged}
-                target={m.target}
-                unit={m.unit}
-                strokeColor={m.strokeColor}
-                textColor={m.text}
-                subLabel={m.subLabel}
-                size={68}
-              />
-            ))}
-          </div>
-        </div>
+        <MacroNumericalDataTable
+          macroRows={macroRows}
+          netCarbs={dailyNutrition.netCarbs || 0}
+        />
       )}
 
       {/* TAB 2: EXPANDED MICRONUTRIENTS SPIDER / RADAR CHART */}
@@ -690,7 +586,6 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
       {/* TAB 3: PEPTIDE-DRIVEN AMINO ACID PRIORITIZATION & FOOD RECOMMENDATIONS */}
       {detailSubTab === 'aminos' && (
         <div className="space-y-3">
-          {/* Active Peptide Synergy Banner */}
           <div className="rounded-xl bg-violet-950/60 border border-violet-400/40 p-2.5 space-y-1">
             <div className="flex items-center justify-between gap-1">
               <span className="text-[9px] font-black uppercase tracking-wider text-violet-300 flex items-center gap-1">
@@ -704,9 +599,6 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
             <div className="text-[11px] font-black text-white">
               {peptideSynergy.peptideLabel}
             </div>
-            <p className="text-[10px] text-slate-300 leading-snug">
-              {peptideSynergy.protocolObjective}
-            </p>
           </div>
 
           {quickLoggedFoodMsg && (
@@ -734,7 +626,6 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
                     <div className="text-[9px] font-bold text-cyan-300 truncate">
                       {food.highlight}
                     </div>
-                    <div className="text-[8px] text-slate-400 truncate">{food.benefit}</div>
                   </div>
                   <button
                     type="button"
@@ -786,8 +677,6 @@ export default function PersistentAllowanceChart({ showDetailedBreakdown = false
 
                   {isPrioritized && (
                     <div className="text-[9px] leading-snug text-slate-300 pt-0.5">
-                      <span className="text-cyan-300 font-bold">Synergy:</span>{' '}
-                      {r.synergy.synergyReason}{' '}
                       <span className="text-emerald-300 font-bold">
                         Best Foods: {r.synergy.foods}
                       </span>

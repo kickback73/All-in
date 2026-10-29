@@ -1,7 +1,6 @@
 // src/components/PeptideCalculator.jsx
 import React, { useState, useMemo } from 'react';
 import {
-  Syringe,
   ShieldCheck,
   Search,
   AlertOctagon,
@@ -32,128 +31,119 @@ export const GRANULAR_INJECTION_SITES = [
 ];
 
 export const SYRINGE_CAPACITIES = [
-  { value: 0.3, label: '0.3 ml (30 Units)' },
-  { value: 0.5, label: '0.5 ml (50 Units)' },
-  { value: 1.0, label: '1.0 ml (100 Units)' },
+  { value: 0.3, label: '0.3 ml (30U)' },
+  { value: 0.5, label: '0.5 ml (50U)' },
+  { value: 1.0, label: '1.0 ml (100U)' },
 ];
 
-/**
- * Strictly Cleared Presets for Dan's NHL Remission Protocol.
- * Tirzepatide, Semaglutide, and all angiogenic/secretagogue contraindications are permanently excluded from suggestions.
- */
 const CLEARED_PEPTIDE_PRESETS = [
   {
     name: 'Retatrutide (GLP-1/GIP/GCGR)',
+    shortName: 'Retatrutide',
     defaultVialMg: 10,
     defaultBacMl: 2,
     defaultDose: 3,
     defaultUnit: 'mg',
-    status: 'ACTIVE_PROTOCOL',
+    frequency: '1x Weekly',
+    focus: 'Fat Loss & Lean Muscle Preservation',
+    status: 'ACTIVE',
   },
   {
-    name: 'Matrixyl 3000 (Palmitoyl Tripeptide-1 + Tetrapeptide-7)',
+    name: 'Matrixyl 3000 (Dermal Collagen Complex)',
+    shortName: 'Matrixyl 3000',
     defaultVialMg: 5,
     defaultBacMl: 2,
     defaultDose: 250,
     defaultUnit: 'mcg',
+    frequency: 'Daily',
+    focus: 'Skin Firmness & Collagen Support',
     status: 'CLEARED',
   },
   {
-    name: 'Rigin (Palmitoyl Tetrapeptide-7 — Elastin & IL-6 Modulator)',
+    name: 'Rigin (Elastin & Skin Balance)',
+    shortName: 'Rigin',
     defaultVialMg: 5,
     defaultBacMl: 2,
     defaultDose: 200,
     defaultUnit: 'mcg',
+    frequency: 'Daily',
+    focus: 'Facial Elastin & Tone Preservation',
     status: 'CLEARED',
   },
   {
-    name: 'Argireline (Acetyl Hexapeptide-8 — Non-Angiogenic Skin)',
+    name: 'Argireline (Expression Line Support)',
+    shortName: 'Argireline',
     defaultVialMg: 5,
     defaultBacMl: 2,
     defaultDose: 200,
     defaultUnit: 'mcg',
+    frequency: 'Daily',
+    focus: 'Surface Line Relaxation',
     status: 'CLEARED',
   },
   {
-    name: 'SNAP-8 (Acetyl Octapeptide-3 — Dermal Integrity)',
+    name: 'SNAP-8 (Dermal Integrity)',
+    shortName: 'SNAP-8',
     defaultVialMg: 5,
     defaultBacMl: 2,
     defaultDose: 200,
     defaultUnit: 'mcg',
+    frequency: 'Daily',
+    focus: 'Skin Smoothness & Elasticity',
     status: 'CLEARED',
   },
 ];
 
 /**
- * Rich Clinical Database for Cleared Peptides (Fixes empty green bar on search, including typos like "retratude")
+ * Clean, Scannable Protocol Reference Cards (No dense clinical walls of text)
  */
-const CLINICAL_PEPTIDE_MONOGRAPHS = [
+const SCANNABLE_PROTOCOL_SUMMARIES = [
   {
-    keywords: ['retatrutide', 'retratude', 'reta', 'ly3437943', 'glp-1/gip/gcgr'],
-    title: 'Retatrutide (LY3437943 — Triple Agonist: GLP-1R / GIPR / GCGR)',
-    status: 'CLEARED — ACTIVE WEEKLY PROTOCOL (NHL Remission Safe)',
-    mechanism:
-      'Triple-hormone receptor agonist activating Glucagon-Like Peptide-1 (GLP-1), Glucose-Dependent Insulinotropic Polypeptide (GIP), and Glucagon (GCGR) receptors.',
-    pathways:
-      'GCGR activation increases hepatic beta-oxidation and resting energy expenditure while GLP-1R/GIPR signaling improves insulin sensitivity and satiety. Calibrated with 1,850–1,950 kcal/day and 170–190g protein to prevent rapid facial fat pad atrophy ("GLP-1 face") and preserve lean skeletal mass.',
-    dosageContext:
-      "Dan's Active Protocol: 3 mg subcutaneously once weekly (e.g., 10 mg vial reconstituted with 2.0 ml BAC water = 0.60 ml / 60 Units on U-100 syringe).",
-    safetyProfile:
-      'Oncology & NHL Remission Profile: Does NOT stimulate VEGF, bFGF, endothelial cell migration, or pituitary GH/IGF-1 mitogenic signaling. Monitor GI transit, hydration (750ml+ morning electrolyte stack), and steady weekly weight loss pacing (229 lbs → 200 lbs).',
-    defaultDose: '3 mg once weekly',
+    keywords: ['retatrutide', 'retratude', 'reta', 'ly3437943', 'glp-1'],
+    name: 'Retatrutide',
+    badge: 'ACTIVE WEEKLY PROTOCOL • NHL SAFE',
+    primaryGoal: 'Steady fat loss (229 → 200 lbs) while protecting muscle & facial volume',
+    standardDose: '3 mg once weekly (60 Units from 10mg/2ml vial)',
+    keySupport: '180g Protein + 750ml Morning Electrolytes + 14g Collagen',
+    safetyStatus: 'Cleared — Zero VEGF / angiogenic growth signaling',
+    defaultDose: '3 mg weekly',
   },
   {
-    keywords: ['matrixyl', 'palmitoyl tripeptide', 'palmitoyl tetrapeptide'],
-    title: 'Matrixyl 3000 (Palmitoyl Tripeptide-1 & Palmitoyl Tetrapeptide-7)',
-    status: 'CLEARED — NON-ANGIOGENIC DERMAL / ELASTIN SUPPORT',
-    mechanism:
-      'Matrikine signaling peptide complex that mimics extracellular matrix breakdown fragments to stimulate local fibroblast synthesis of Type I/IV collagen, fibronectin, and glycosaminoglycans without vascular growth factor induction.',
-    pathways:
-      'Suppresses excess cutaneous IL-6 secretion and glycation damage, preserving dermal thickness and facial elastin scaffolding during body recomposition.',
-    dosageContext:
-      'Topical 3–8% serum twice daily or localized non-angiogenic cosmetic protocol alongside 14g oral bovine collagen.',
-    safetyProfile:
-      'Oncology & NHL Remission Profile: Cleared. Zero systemic VEGF upregulation or copper-mediated neovascularization.',
-    defaultDose: '250 mcg / Topical 2x daily',
+    keywords: ['matrixyl', 'palmitoyl tripeptide'],
+    name: 'Matrixyl 3000',
+    badge: 'CLEARED • SKIN & COLLAGEN',
+    primaryGoal: 'Supports skin thickness and extracellular collagen scaffolding',
+    standardDose: '250 mcg or Topical 2x daily',
+    keySupport: 'Lysine + Vitamin C (120mg) + Bovine Collagen',
+    safetyStatus: 'Cleared — Non-angiogenic local skin support',
+    defaultDose: '250 mcg',
   },
   {
     keywords: ['rigin', 'tetrapeptide-7'],
-    title: 'Rigin (Palmitoyl Tetrapeptide-7)',
-    status: 'CLEARED — ELASTIN & CYTOKINE BALANCE PEPTIDE',
-    mechanism:
-      'Synthetic lipopeptide derived from human immunoglobulin G fragment that downregulates basal and UV-induced Interleukin-6 (IL-6) in keratinocytes and fibroblasts.',
-    pathways:
-      'Slows extracellular matrix degradation and preserves dermal elasticity and facial structural firmness during caloric deficit.',
-    dosageContext: 'Standard cosmetic/dermal concentration or 200 mcg research reference.',
-    safetyProfile:
-      'Oncology & NHL Remission Profile: Cleared. Anti-inflammatory cytokine modulator with no angiogenic or mitogenic activity.',
+    name: 'Rigin',
+    badge: 'CLEARED • ELASTIN SUPPORT',
+    primaryGoal: 'Protects facial elastin and firmness during caloric deficit',
+    standardDose: '200 mcg daily',
+    keySupport: 'Lysine + Threonine + Hydration (3,250ml)',
+    safetyStatus: 'Cleared — Safe for NHL remission protocol',
     defaultDose: '200 mcg',
   },
   {
-    keywords: ['argireline', 'hexapeptide-8', 'snap-8', 'octapeptide-3', 'syn-ake'],
-    title: 'Argireline / SNAP-8 (Acetyl Hexapeptide-8 / Octapeptide-3)',
-    status: 'CLEARED — NEUROMUSCULAR DERMAL RELAXATION PEPTIDE',
-    mechanism:
-      'Competes with SNAP-25 at the SNARE complex to modulate excessive acetylcholine vesicle exocytosis at superficial facial neuromuscular junctions.',
-    pathways:
-      'Reduces dynamic mechanical creasing of dermal elastin fibers while preserving subcutaneous facial fat pad volume.',
-    dosageContext: 'Topical 5–10% peptide serum or 200 mcg localized protocol.',
-    safetyProfile:
-      'Oncology & NHL Remission Profile: Cleared. Strictly localized SNARE modulation; zero VEGF or systemic growth factor activity.',
+    keywords: ['argireline', 'hexapeptide', 'snap-8', 'octapeptide'],
+    name: 'Argireline / SNAP-8',
+    badge: 'CLEARED • DERMAL SMOOTHING',
+    primaryGoal: 'Reduces dynamic facial tension and preserves skin recoil',
+    standardDose: '200 mcg or Topical serum',
+    keySupport: 'Histidine + Lysine + Tryptophan',
+    safetyStatus: 'Cleared — Zero systemic growth factor activity',
     defaultDose: '200 mcg',
   },
 ];
 
-const GHK_CU_EXACT_WARNING =
-  "PROHIBITED (Dan's NHL Remission Rule) — GHK-CU: ONCOLOGY CONTRAINDICATION (NHL Remission): Directly promotes VEGF expression, endothelial migration, or angiogenesis. May accelerate vascularization of dormant clonal lymphoid microenvironments.";
-
-const GHK_CU_PATHWAY_SUMMARY =
-  'Biological Pathway: GHK-Cu complexes with copper(II) ions to upregulate Vascular Endothelial Growth Factor (VEGF), basic Fibroblast Growth Factor (bFGF), and TGF-β1, stimulating neovascular capillary sprouting and endothelial cell migration.';
-
-const CLEARED_NON_ANGIOGENIC_ALTERNATIVES = [
-  'Matrixyl 3000 (Palmitoyl Tripeptide-1 + Tetrapeptide-7): Local matrikine signaling for dermal collagen I/IV & fibronectin without systemic VEGF.',
-  'Argireline (Acetyl Hexapeptide-8) & Rigin: Preserves facial elastin and DHEA/IL-6 balance without endothelial proliferation.',
-  'Oral Hydrolyzed Bovine Collagen (14g/day) + Vitamin C (60mg) + Hyaluronic Acid: Supports facial fat-pad extracellular scaffolding safely in NHL remission.',
+const SAFE_ALTERNATIVES_LIST = [
+  'Matrixyl 3000 — Non-angiogenic collagen & skin firmness support',
+  'Rigin & Argireline — Facial elastin & skin recoil support',
+  'Bovine Collagen (14g) + Vitamin C — Daily structural skin support',
 ];
 
 function evaluatePeptideSafety(text = '') {
@@ -162,11 +152,10 @@ function evaluatePeptideSafety(text = '') {
 
   if (lower.includes('ghk') || lower.includes('copper')) {
     return {
-      isGhkCu: true,
       isProhibited: true,
-      banner: GHK_CU_EXACT_WARNING,
-      pathway: GHK_CU_PATHWAY_SUMMARY,
-      alternatives: CLEARED_NON_ANGIOGENIC_ALTERNATIVES,
+      banner: 'PROHIBITED (NHL Remission Rule) — GHK-Cu / Copper Peptides',
+      reason: 'Promotes VEGF and new blood vessel growth (angiogenesis). Strictly blocked.',
+      alternatives: SAFE_ALTERNATIVES_LIST,
     };
   }
   if (
@@ -177,13 +166,10 @@ function evaluatePeptideSafety(text = '') {
     lower.includes('thymosin')
   ) {
     return {
-      isGhkCu: false,
       isProhibited: true,
-      banner:
-        "PROHIBITED (Dan's NHL Remission Rule) — ONCOLOGY CONTRAINDICATION: Directly promotes VEGF expression, endothelial nitric oxide, and systemic angiogenesis.",
-      pathway:
-        'Biological Pathway: Upregulates VEGFR2 and focal adhesion kinase (FAK) pathways, driving systemic microvascular proliferation.',
-      alternatives: CLEARED_NON_ANGIOGENIC_ALTERNATIVES,
+      banner: 'PROHIBITED (NHL Remission Rule) — BPC-157 / TB-500',
+      reason: 'Stimulates systemic angiogenesis and vascular growth factors. Strictly blocked.',
+      alternatives: SAFE_ALTERNATIVES_LIST,
     };
   }
   if (
@@ -196,60 +182,54 @@ function evaluatePeptideSafety(text = '') {
     lower.includes('igf')
   ) {
     return {
-      isGhkCu: false,
       isProhibited: true,
-      banner:
-        "PROHIBITED (Dan's NHL Remission Rule) — Growth Hormone Secretagogue: Elevates systemic GH and IGF-1 mitogenic signaling.",
-      pathway:
-        'Biological Pathway: Pituitary GHS-R1a agonism increases hepatic IGF-1 secretion, which acts as a potent anti-apoptotic and mitogenic growth factor in lymphoid tissues.',
-      alternatives: CLEARED_NON_ANGIOGENIC_ALTERNATIVES,
+      banner: 'PROHIBITED (NHL Remission Rule) — GH / IGF-1 Secretagogue',
+      reason: 'Elevates systemic growth hormone and IGF-1 signaling. Strictly blocked.',
+      alternatives: SAFE_ALTERNATIVES_LIST,
     };
   }
   if (lower.includes('ss-31') || lower.includes('mots-c') || lower.includes('elamipretide')) {
     return {
-      isGhkCu: false,
       isProhibited: true,
-      banner:
-        "EXCLUDED (Dan's NHL Remission Rule) — Mitochondrial-targeted peptides (SS-31, MOTS-c) are excluded per protocol.",
-      pathway: 'Focus remains strictly on non-angiogenic elastin/skin integrity and Retatrutide 3mg weekly recomp.',
-      alternatives: CLEARED_NON_ANGIOGENIC_ALTERNATIVES,
+      banner: 'EXCLUDED — Mitochondrial Peptide (SS-31 / MOTS-c)',
+      reason: 'Excluded per protocol rules (focus is strictly on Retatrutide & skin/elastin).',
+      alternatives: SAFE_ALTERNATIVES_LIST,
     };
   }
-  if (lower.includes('tirzepatide') || lower.includes('semaglutide') || lower.includes('ozempic') || lower.includes('mounjaro')) {
+  if (
+    lower.includes('tirzepatide') ||
+    lower.includes('semaglutide') ||
+    lower.includes('ozempic') ||
+    lower.includes('mounjaro')
+  ) {
     return {
-      isGhkCu: false,
       isProhibited: true,
-      banner:
-        "EXCLUDED COMPOUND — Tirzepatide and Semaglutide are excluded from Dan's single-compound active protocol (Retatrutide 3 mg weekly).",
-      pathway:
-        "Dan's Active Protocol utilizes Retatrutide 3 mg once weekly (GLP-1/GIP/GCGR triple agonist) as a single metabolic compound.",
-      alternatives: CLEARED_NON_ANGIOGENIC_ALTERNATIVES,
+      banner: 'EXCLUDED — Duplicate GLP-1 Compound',
+      reason: 'Active protocol uses Retatrutide 3 mg weekly as a single compound.',
+      alternatives: SAFE_ALTERNATIVES_LIST,
     };
   }
   return null;
 }
 
-function resolveClinicalMonograph(queryText = '') {
+function resolveScannableProtocol(queryText = '') {
   const lower = String(queryText || '').trim().toLowerCase();
   if (!lower) return null;
 
-  for (const item of CLINICAL_PEPTIDE_MONOGRAPHS) {
+  for (const item of SCANNABLE_PROTOCOL_SUMMARIES) {
     if (item.keywords.some((kw) => lower.includes(kw))) {
       return item;
     }
   }
 
   return {
-    title: `${queryText.trim()} — Clinical & NHL Remission Verification`,
-    status: 'CLEARED FOR REVIEW (No Direct VEGF / Angiogenic Signal Flagged)',
-    mechanism:
-      'Evaluated against Non-Hodgkin Lymphoma (NHL) remission contraindication criteria (VEGF, bFGF, endothelial migration, and GH/IGF-1 secretagogue pathways).',
-    pathways:
-      'Prioritizes non-angiogenic dermal elastin/collagen integrity and steady body recomposition alongside Retatrutide 3 mg weekly.',
-    dosageContext: 'Verify vial concentration (mg/ml) and BAC water volume before administration.',
-    safetyProfile:
-      'Passed automated NHL angiogenesis screen. Avoid combining with copper peptides (GHK-Cu), BPC-157, TB-500, or GH secretagogues.',
-    defaultDose: 'Custom Protocol',
+    name: queryText.trim(),
+    badge: 'CLEARED FOR REVIEW • NHL SCREEN PASSED',
+    primaryGoal: 'Custom protocol entry — no direct angiogenic or GH signaling detected',
+    standardDose: 'Verify vial mg and BAC water ml in calculator above',
+    keySupport: 'High-protein diet + hydration + collagen support',
+    safetyStatus: 'Passed automated NHL contraindication check',
+    defaultDose: 'Custom Dose',
   };
 }
 
@@ -266,7 +246,6 @@ export default function PeptideCalculator({ isOpen = true }) {
     logStackToDaily,
   } = useAppContext();
 
-  // Reconstitution & Logging Form State
   const [peptideName, setPeptideName] = useState(
     activePeptideName || 'Retatrutide (GLP-1/GIP/GCGR)'
   );
@@ -274,20 +253,18 @@ export default function PeptideCalculator({ isOpen = true }) {
   const [bacWaterMl, setBacWaterMl] = useState(2);
   const [desiredDoseValue, setDesiredDoseValue] = useState(3);
   const [desiredDoseUnit, setDesiredDoseUnit] = useState('mg');
-  const [syringeCapacityMl, setSyringeCapacityMl] = useState(1.0); // 0.3 ml | 0.5 ml | 1.0 ml
+  const [syringeCapacityMl, setSyringeCapacityMl] = useState(1.0);
   const [injectionSite, setInjectionSite] = useState(GRANULAR_INJECTION_SITES[0]);
   const [injectionDateTime, setInjectionDateTime] = useState(() =>
     new Date().toISOString().slice(0, 16)
   );
 
-  // Editing existing injection record state
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState(null);
 
-  // Research / Oncology Query State (Default populated with Retatrutide so user immediately sees rich clinical data)
   const [queryName, setQueryName] = useState('Retatrutide');
   const [researchResult, setResearchResult] = useState(() =>
-    resolveClinicalMonograph('Retatrutide')
+    resolveScannableProtocol('Retatrutide')
   );
   const [addedToStackBanner, setAddedToStackBanner] = useState('');
 
@@ -303,7 +280,6 @@ export default function PeptideCalculator({ isOpen = true }) {
 
     if (vialMcg <= 0 || water <= 0 || doseMcg <= 0) {
       return {
-        concentrationMcgPerMl: 0,
         concentrationMgPerMl: '0.00',
         volumeMl: '0.000',
         syringeUnits: '0.0',
@@ -321,7 +297,6 @@ export default function PeptideCalculator({ isOpen = true }) {
     const fillPct = Math.min(100, Math.round((volumeMl / maxCapMl) * 100));
 
     return {
-      concentrationMcgPerMl: Math.round(concentrationMcgPerMl),
       concentrationMgPerMl: concentrationMgPerMl.toFixed(2),
       volumeMl: volumeMl.toFixed(3),
       syringeUnits: syringeUnits.toFixed(1),
@@ -357,7 +332,7 @@ export default function PeptideCalculator({ isOpen = true }) {
     const verified = await lookupVerifiedNutrients(foodRec.query, foodRec.serving);
     if (verified) {
       logStackToDaily(verified, foodRec.name);
-      setAddedToStackBanner(`Logged synergistic food "${foodRec.name}" to Daily Totals!`);
+      setAddedToStackBanner(`Logged "${foodRec.name}" to Daily Totals!`);
       setTimeout(() => setAddedToStackBanner(''), 2500);
     }
   };
@@ -439,24 +414,24 @@ export default function PeptideCalculator({ isOpen = true }) {
       return;
     }
 
-    const monograph = resolveClinicalMonograph(queryName);
-    setResearchResult(monograph);
+    const summary = resolveScannableProtocol(queryName);
+    setResearchResult(summary);
   };
 
-  // Dedicated action: "Start / Add to Custom Stack" for any NHL-cleared peptide
   const handleAddClearedPeptideToCustomStack = (compoundTitle, doseLabel) => {
+    const cleanTitle = compoundTitle.split(' (')[0];
     const newStack = {
       id: `stack_pep_${Date.now()}`,
-      name: `${compoundTitle.split(' (')[0]} Protocol Stack`,
+      name: `${cleanTitle} Protocol Stack`,
       category: 'Morning Stacks',
       scheduledHour: '08:00',
       isRecurringPlanned: true,
       ingredients: [
         {
           id: `ing_pep_${Date.now()}_1`,
-          name: `${compoundTitle.split(' (')[0]} (${doseLabel})`,
+          name: `${cleanTitle} (${doseLabel})`,
           servingGrams: doseLabel,
-          source: 'Cleared NHL Remission Protocol',
+          source: 'Cleared NHL Protocol',
           calories: 0,
           protein: 0,
           carbs: 0,
@@ -464,11 +439,8 @@ export default function PeptideCalculator({ isOpen = true }) {
           netCarbs: 0,
           fats: 0,
           waterMl: 0,
-          micros: { vitaminD: 0, vitaminC: 0, magnesium: 0, zinc: 0, potassium: 0, sodium: 0 },
-          aminos: {
-            leucine: 0, isoleucine: 0, valine: 0, lysine: 0, methionine: 0,
-            phenylalanine: 0, threonine: 0, tryptophan: 0, histidine: 0,
-          },
+          micros: {},
+          aminos: {},
         },
       ],
       totals: {
@@ -479,60 +451,62 @@ export default function PeptideCalculator({ isOpen = true }) {
         netCarbs: 0,
         fats: 0,
         waterMl: 0,
-        micros: { vitaminD: 0, vitaminC: 0, magnesium: 0, zinc: 0, potassium: 0, sodium: 0 },
-        aminos: {
-          leucine: 0, isoleucine: 0, valine: 0, lysine: 0, methionine: 0,
-          phenylalanine: 0, threonine: 0, tryptophan: 0, histidine: 0,
-        },
+        micros: {},
+        aminos: {},
       },
       createdAt: new Date().toISOString(),
     };
 
     setSavedStacks([newStack, ...savedStacks]);
-    setAddedToStackBanner(`Added "${newStack.name}" to Get Stacked (Morning Stacks)!`);
+    setAddedToStackBanner(`Added "${newStack.name}" to Get Stacked!`);
     setTimeout(() => setAddedToStackBanner(''), 3000);
   };
 
   return (
-    <div className="space-y-3.5 text-white">
-      {/* Persistent Daily Recommended vs. Logged Intake Chart */}
+    <div className="space-y-3 text-white">
+      {/* Persistent Daily Recommended vs. Logged Intake Table */}
       <PersistentAllowanceChart />
 
-      {/* Dan's Active Protocol + NHL Remission Guardrail Banner */}
-      <div className="rounded-2xl bg-emerald-500/15 border border-emerald-400/30 p-3 flex items-start gap-2.5">
-        <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-        <div className="text-[11px] text-emerald-100 leading-relaxed">
-          <span className="font-black uppercase tracking-wider text-emerald-300">
-            Active Protocol: Retatrutide 3 mg Weekly
-          </span>{' '}
-          • <strong>NHL Remission Safeguard Active:</strong> GHK-Cu, copper peptides, BPC-157, TB-500, GH secretagogues, Tirzepatide, and Semaglutide are excluded.
+      {/* Scannable Active Protocol Header */}
+      <div className="rounded-2xl bg-emerald-500/15 border border-emerald-400/35 p-2.5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+          <div className="min-w-0">
+            <div className="text-[10px] font-black uppercase text-emerald-300 truncate">
+              Active Protocol: Retatrutide 3 mg Weekly
+            </div>
+            <div className="text-[9px] text-slate-200 truncate">
+              NHL Guard Active • Blocks GHK-Cu, BPC-157, TB-500 &amp; GH Secretagogues
+            </div>
+          </div>
         </div>
+        <span className="px-2 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/40 text-[9px] font-black text-emerald-200 shrink-0">
+          60U / Wk
+        </span>
       </div>
 
       {addedToStackBanner && (
-        <div className="rounded-xl bg-amber-500/20 border border-amber-400/50 p-2.5 flex items-center gap-2 text-amber-200 text-xs font-black">
+        <div className="rounded-xl bg-amber-500/20 border border-amber-400/50 p-2 flex items-center gap-2 text-amber-200 text-xs font-black">
           <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
           <span>{addedToStackBanner}</span>
         </div>
       )}
 
-      {/* Prominent Critical Oncology Contraindication Alert when GHK-Cu or Prohibited Peptide is Entered */}
+      {/* Safety Alert if Prohibited Compound Entered */}
       {activeSafetyAlert && (
-        <div className="rounded-2xl bg-rose-950 text-white border-2 border-rose-500 p-3.5 space-y-2 shadow-xl">
-          <div className="flex items-start gap-2">
-            <AlertOctagon className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-            <div className="text-xs font-black text-rose-200 leading-snug">
-              {activeSafetyAlert.banner}
-            </div>
+        <div className="rounded-2xl bg-rose-950 text-white border-2 border-rose-500 p-3 space-y-2 shadow-xl">
+          <div className="flex items-center gap-2">
+            <AlertOctagon className="w-4 h-4 text-rose-400 shrink-0" />
+            <div className="text-xs font-black text-rose-200">{activeSafetyAlert.banner}</div>
           </div>
-          <p className="text-[11px] text-rose-100/90 leading-relaxed bg-rose-900/50 rounded-xl p-2 border border-rose-400/30">
-            {activeSafetyAlert.pathway}
+          <p className="text-[11px] text-rose-100 bg-rose-900/50 rounded-xl p-2 border border-rose-400/30">
+            {activeSafetyAlert.reason}
           </p>
-          <div className="bg-emerald-950/80 border border-emerald-500/40 rounded-xl p-2.5 space-y-1">
-            <div className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
-              ✓ Oncology-Cleared Non-Angiogenic Skin &amp; Elastin Alternatives:
+          <div className="bg-emerald-950/80 border border-emerald-500/40 rounded-xl p-2 space-y-1">
+            <div className="text-[9px] font-black uppercase text-emerald-300">
+              ✓ Safe Alternatives:
             </div>
-            <ul className="text-[10px] text-emerald-100 space-y-1 list-disc pl-4">
+            <ul className="text-[10px] text-emerald-100 space-y-0.5 list-disc pl-4">
               {activeSafetyAlert.alternatives.map((alt, i) => (
                 <li key={i}>{alt}</li>
               ))}
@@ -541,83 +515,89 @@ export default function PeptideCalculator({ isOpen = true }) {
         </div>
       )}
 
-      {/* Peptide Selection + Syringe Capacity Selector + Auto BAC Water Reconstitution Calculator + Granular Injection Logger */}
+      {/* Clean Scannable BAC Water & Dose Calculator + Logger */}
       <form
         onSubmit={handleLogDose}
-        className="rounded-2xl bg-slate-900/90 border border-white/15 p-3.5 space-y-3"
+        className="rounded-2xl bg-slate-900/90 border border-white/15 p-3 space-y-2.5"
       >
-        <div>
-          <label className="block text-[10px] font-extrabold text-violet-300 uppercase mb-1">
-            Select NHL-Cleared Peptide or Enter Compound
-          </label>
-          <select
-            value={
-              CLEARED_PEPTIDE_PRESETS.some((p) => p.name === peptideName) ? peptideName : 'CUSTOM'
-            }
-            onChange={(e) => {
-              if (e.target.value === 'CUSTOM') {
-                setPeptideName('');
-              } else {
-                handleSelectPreset(e.target.value);
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[9px] font-extrabold text-violet-300 uppercase mb-1">
+              Protocol Preset
+            </label>
+            <select
+              value={
+                CLEARED_PEPTIDE_PRESETS.some((p) => p.name === peptideName)
+                  ? peptideName
+                  : 'CUSTOM'
               }
-            }}
-            className="w-full rounded-xl border border-white/15 bg-slate-950 px-2.5 py-2 text-xs font-bold text-white mb-1.5"
-          >
-            {CLEARED_PEPTIDE_PRESETS.map((p) => (
-              <option key={p.name} value={p.name} className="bg-slate-950 text-white">
-                {p.name}
+              onChange={(e) => {
+                if (e.target.value === 'CUSTOM') {
+                  setPeptideName('');
+                } else {
+                  handleSelectPreset(e.target.value);
+                }
+              }}
+              className="w-full rounded-xl border border-white/15 bg-slate-950 px-2.5 py-1.5 text-xs font-bold text-white"
+            >
+              {CLEARED_PEPTIDE_PRESETS.map((p) => (
+                <option key={p.name} value={p.name} className="bg-slate-950 text-white">
+                  {p.shortName} ({p.defaultDose}
+                  {p.defaultUnit} • {p.frequency})
+                </option>
+              ))}
+              <option value="CUSTOM" className="bg-slate-950 text-white">
+                + Custom Peptide...
               </option>
-            ))}
-            <option value="CUSTOM" className="bg-slate-950 text-white">
-              + Enter Custom Peptide Name...
-            </option>
-          </select>
-          <input
-            type="text"
-            required
-            value={peptideName}
-            onChange={(e) => {
-              const val = e.target.value;
-              setPeptideName(val);
-              if (!evaluatePeptideSafety(val)?.isProhibited && val.trim()) {
-                setActivePeptideName(val);
-              }
-            }}
-            placeholder="Type peptide name (e.g. Retatrutide, Matrixyl 3000)..."
-            className="w-full rounded-xl border border-white/15 bg-slate-950 px-3 py-1.5 text-xs font-bold text-white"
-          />
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[9px] font-extrabold text-slate-300 uppercase mb-1">
+              Compound Name
+            </label>
+            <input
+              type="text"
+              required
+              value={peptideName}
+              onChange={(e) => {
+                const val = e.target.value;
+                setPeptideName(val);
+                if (!evaluatePeptideSafety(val)?.isProhibited && val.trim()) {
+                  setActivePeptideName(val);
+                }
+              }}
+              placeholder="e.g. Retatrutide, Matrixyl 3000..."
+              className="w-full rounded-xl border border-white/15 bg-slate-950 px-2.5 py-1.5 text-xs font-bold text-white"
+            />
+          </div>
         </div>
 
-        {/* Syringe Capacity Selector (0.3 ml, 0.5 ml, 1.0 ml) */}
-        <div>
-          <label className="block text-[10px] font-extrabold text-violet-300 uppercase mb-1">
-            Syringe Capacity Selector
-          </label>
-          <div className="grid grid-cols-3 gap-1.5">
-            {SYRINGE_CAPACITIES.map((cap) => {
-              const isSelected = Number(syringeCapacityMl) === cap.value;
-              return (
-                <button
-                  key={cap.value}
-                  type="button"
-                  onClick={() => setSyringeCapacityMl(cap.value)}
-                  className={`py-1.5 px-2 rounded-xl text-xs font-black border transition ${
-                    isSelected
-                      ? 'bg-violet-500 text-slate-950 border-violet-300 shadow-sm'
-                      : 'bg-slate-950 text-slate-300 border-white/15 hover:border-violet-400/50'
-                  }`}
-                >
-                  {cap.label}
-                </button>
-              );
-            })}
-          </div>
+        {/* Syringe Size Selector */}
+        <div className="grid grid-cols-3 gap-1.5">
+          {SYRINGE_CAPACITIES.map((cap) => {
+            const isSelected = Number(syringeCapacityMl) === cap.value;
+            return (
+              <button
+                key={cap.value}
+                type="button"
+                onClick={() => setSyringeCapacityMl(cap.value)}
+                className={`py-1.5 px-2 rounded-xl text-[11px] font-black border transition ${
+                  isSelected
+                    ? 'bg-violet-500 text-slate-950 border-violet-300'
+                    : 'bg-slate-950 text-slate-300 border-white/15'
+                }`}
+              >
+                {cap.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Vial (mg), BAC Water (ml), Desired Dose */}
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+            <label className="block text-[9px] font-extrabold text-slate-300 uppercase mb-0.5">
               Vial (mg)
             </label>
             <input
@@ -631,7 +611,7 @@ export default function PeptideCalculator({ isOpen = true }) {
           </div>
 
           <div>
-            <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
+            <label className="block text-[9px] font-extrabold text-slate-300 uppercase mb-0.5">
               BAC Water (ml)
             </label>
             <input
@@ -645,8 +625,8 @@ export default function PeptideCalculator({ isOpen = true }) {
           </div>
 
           <div>
-            <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
-              Desired Dose
+            <label className="block text-[9px] font-extrabold text-slate-300 uppercase mb-0.5">
+              Dose
             </label>
             <div className="flex rounded-xl border border-white/15 bg-slate-950 overflow-hidden">
               <input
@@ -669,16 +649,16 @@ export default function PeptideCalculator({ isOpen = true }) {
           </div>
         </div>
 
-        {/* Simplified User-Friendly Injection Site Dropdown + Exact Date & Time */}
+        {/* Injection Site & Date/Time */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
-            <label className="block text-[10px] font-extrabold text-slate-200 uppercase mb-1">
+            <label className="block text-[9px] font-extrabold text-slate-300 uppercase mb-0.5">
               Injection Site
             </label>
             <select
               value={injectionSite}
               onChange={(e) => setInjectionSite(e.target.value)}
-              className="w-full rounded-xl border border-white/20 bg-slate-950/85 px-2.5 py-1.5 text-xs font-bold text-white"
+              className="w-full rounded-xl border border-white/20 bg-slate-950 px-2.5 py-1.5 text-xs font-bold text-white"
             >
               {GRANULAR_INJECTION_SITES.map((site) => (
                 <option key={site} value={site} className="bg-slate-950 text-white">
@@ -688,8 +668,8 @@ export default function PeptideCalculator({ isOpen = true }) {
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-extrabold text-slate-300 uppercase mb-1">
-              Exact Date &amp; Time
+            <label className="block text-[9px] font-extrabold text-slate-300 uppercase mb-0.5">
+              Date &amp; Time
             </label>
             <input
               type="datetime-local"
@@ -700,37 +680,36 @@ export default function PeptideCalculator({ isOpen = true }) {
           </div>
         </div>
 
-        {/* Auto-Calculated Syringe Pull Output + Visual Gauge */}
-        <div className="rounded-xl bg-slate-950 border border-violet-500/40 p-3 space-y-2">
+        {/* Scannable Draw Readout */}
+        <div className="rounded-xl bg-slate-950 border border-violet-500/40 p-2.5 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <div>
               <div className="text-[9px] font-bold uppercase text-slate-400">
-                Concentration: {calculation.concentrationMgPerMl} mg/ml • {calculation.maxCapMl} ml ({calculation.maxCapUnits}U) Syringe
+                {calculation.concentrationMgPerMl} mg/ml • {calculation.maxCapMl} ml Syringe
               </div>
               <div className="text-sm font-black text-violet-300">
-                Pull to {calculation.syringeUnits} Units{' '}
+                Pull {calculation.syringeUnits} Units{' '}
                 <span className="text-xs font-bold text-slate-300">
-                  ({calculation.volumeMl} ml / {calculation.maxCapMl} ml)
+                  ({calculation.volumeMl} ml)
                 </span>
               </div>
               {calculation.exceedsSyringe && (
-                <div className="text-[10px] font-bold text-amber-300 mt-0.5">
-                  ⚠ Volume ({calculation.volumeMl} ml) exceeds {calculation.maxCapMl} ml syringe capacity — select a 1.0 ml syringe or split draw.
+                <div className="text-[9px] font-bold text-amber-300">
+                  ⚠ Exceeds {calculation.maxCapMl} ml syringe — use 1.0 ml syringe.
                 </div>
               )}
             </div>
             <button
               type="submit"
               disabled={Boolean(activeSafetyAlert?.isProhibited)}
-              className="px-3.5 py-2 rounded-xl text-xs font-black text-slate-950 bg-violet-400 hover:bg-violet-300 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 shadow-xs transition shrink-0"
+              className="px-3.5 py-2 rounded-xl text-xs font-black text-slate-950 bg-violet-400 hover:bg-violet-300 disabled:opacity-40 flex items-center gap-1 shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Log Dose</span>
             </button>
           </div>
 
-          {/* Visual Syringe Barrel Scale */}
-          <div className="w-full h-2.5 rounded-full bg-slate-900 border border-white/15 overflow-hidden">
+          <div className="w-full h-2 rounded-full bg-slate-900 border border-white/15 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-300 ${
                 calculation.exceedsSyringe
@@ -750,203 +729,154 @@ export default function PeptideCalculator({ isOpen = true }) {
                   `${desiredDoseValue} ${desiredDoseUnit}`
                 )
               }
-              className="w-full py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 text-[11px] font-black flex items-center justify-center gap-1.5 transition"
+              className="w-full py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 text-[10px] font-black flex items-center justify-center gap-1.5"
             >
-              <Layers className="w-3.5 h-3.5 text-amber-300" />
-              <span>Start / Add to Custom Stack</span>
+              <Layers className="w-3 h-3 text-amber-300" />
+              <span>Add Protocol to Get Stacked</span>
             </button>
           )}
         </div>
       </form>
 
-      {/* Targeted Amino Acid Prioritization & Synergistic Food Recommendations for Active Peptide */}
+      {/* Scannable Priority Amino Acids & 1-Tap Food Chips */}
       {!activeSafetyAlert?.isProhibited && activePeptideSynergy && (
-        <div className="rounded-2xl border border-cyan-400/40 p-3.5 space-y-2.5 bg-slate-900/90">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-black uppercase tracking-wider text-cyan-300">
-              ★ Peptide-Driven Amino Prioritization &amp; Food Sources
-            </span>
-            <span className="text-[9px] font-bold text-emerald-300">
-              {activePeptideSynergy.peptideLabel.split(' (')[0]}
+        <div className="rounded-2xl border border-cyan-400/35 p-3 space-y-2 bg-slate-900/90">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase text-cyan-300">
+              ★ Priority Aminos for {activePeptideSynergy.peptideLabel.split(' (')[0]}
             </span>
           </div>
-          <p className="text-[10px] text-slate-300 leading-snug">
-            {activePeptideSynergy.protocolObjective}
-          </p>
 
-          <div className="space-y-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {Object.entries(activePeptideSynergy.prioritizedAminos).map(([key, info]) => (
-              <div
+              <span
                 key={key}
-                className="rounded-xl bg-slate-950/90 border border-cyan-500/30 p-2 space-y-0.5"
+                className="px-2 py-1 rounded-lg bg-slate-950 border border-cyan-500/35 text-[10px] font-black text-white flex items-center gap-1"
               >
-                <div className="flex items-center justify-between gap-1">
-                  <span className="text-[10px] font-black uppercase text-white">
-                    {key}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-amber-400 text-slate-950">
-                    {info.badge}
-                  </span>
-                </div>
-                <p className="text-[9px] text-slate-300 leading-snug">{info.synergyReason}</p>
-                <div className="text-[9px] font-bold text-emerald-300">
-                  Top Foods: {info.foods}
-                </div>
-              </div>
+                <span className="text-amber-300">#{info.rank}</span>
+                <span className="uppercase">{key}</span>
+              </span>
             ))}
           </div>
 
-          <div className="space-y-1.5 pt-1">
-            <div className="text-[9px] font-black uppercase tracking-wider text-emerald-300">
-              Direct Food Recommendations (Tap to Log to Daily Nutrition)
-            </div>
+          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
             {(activePeptideSynergy.recommendedFoods || []).map((food) => (
-              <div
+              <button
                 key={food.name}
-                className="rounded-xl bg-slate-950/90 border border-white/15 px-2.5 py-1.5 flex items-center justify-between gap-2"
+                type="button"
+                onClick={() => handleQuickLogSynergyFood(food)}
+                className="rounded-xl bg-slate-950 hover:bg-slate-900 border border-white/15 px-2.5 py-1.5 text-left flex items-center justify-between gap-1.5 transition"
               >
                 <div className="min-w-0">
                   <div className="text-[10px] font-black text-white truncate">{food.name}</div>
-                  <div className="text-[9px] font-bold text-cyan-300 truncate">{food.highlight}</div>
+                  <div className="text-[8px] font-bold text-emerald-300 truncate">
+                    Tap to Log
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogSynergyFood(food)}
-                  className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[9px] font-black shrink-0 flex items-center gap-0.5"
-                >
-                  <Plus className="w-2.5 h-2.5" />
-                  <span>Log Food</span>
-                </button>
-              </div>
+                <Plus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* NHL Remission Clinical Search & Monograph Verifier (Populated Summary Panel + Start/Add to Custom Stack) */}
-      <div className="rounded-2xl border border-white/15 p-3.5 space-y-2.5 bg-slate-900/90">
+      {/* Scannable Quick Protocol Lookup & NHL Safety Check */}
+      <div className="rounded-2xl border border-white/15 p-3 space-y-2 bg-slate-900/90">
         <div className="text-[10px] font-extrabold uppercase tracking-wider text-violet-300 flex items-center gap-1.5">
           <Activity className="w-3.5 h-3.5" />
-          <span>NHL Remission Clinical Peptide Search &amp; Monograph Verifier</span>
+          <span>Quick Protocol &amp; NHL Safety Lookup</span>
         </div>
 
-        <form onSubmit={handleResearchPeptide} className="flex flex-wrap sm:flex-nowrap gap-1.5 w-full">
+        <form onSubmit={handleResearchPeptide} className="flex gap-1.5 w-full">
           <input
             type="text"
             value={queryName}
             onChange={(e) => setQueryName(e.target.value)}
-            placeholder="Search peptide (e.g. Retatrutide, Matrixyl 3000, Rigin, GHK-Cu)..."
-            className="min-w-0 flex-1 rounded-xl border border-white/15 bg-slate-950 px-3 py-2 text-xs font-bold text-white"
+            placeholder="Check compound (e.g. Retatrutide, Matrixyl, GHK-Cu)..."
+            className="min-w-0 flex-1 rounded-xl border border-white/15 bg-slate-950 px-2.5 py-1.5 text-xs font-bold text-white"
           />
           <button
             type="submit"
-            className="px-3.5 py-2 rounded-xl bg-violet-500 hover:bg-violet-400 text-slate-950 text-xs font-black flex items-center gap-1 shrink-0"
+            className="px-3 py-1.5 rounded-xl bg-violet-500 hover:bg-violet-400 text-slate-950 text-xs font-black flex items-center gap-1 shrink-0"
           >
             <Search className="w-3.5 h-3.5" />
-            <span>Search / Verify</span>
+            <span>Check</span>
           </button>
         </form>
 
-        {/* If prohibited/contraindicated */}
         {querySafetyAlert ? (
-          <div className="rounded-2xl p-3 text-xs space-y-2 border-2 bg-rose-950 text-white border-rose-500">
+          <div className="rounded-xl p-2.5 text-xs space-y-1.5 border-2 bg-rose-950 text-white border-rose-500">
             <div className="font-black text-rose-200">{querySafetyAlert.banner}</div>
-            <p className="text-[11px] text-rose-100/90">{querySafetyAlert.pathway}</p>
-            <div className="pt-1 border-t border-rose-500/30">
-              <div className="text-[10px] font-black uppercase text-emerald-300">
-                Oncology-Cleared Non-Angiogenic Alternatives:
-              </div>
-              <ul className="text-[10px] text-emerald-100 list-disc pl-4 space-y-0.5 mt-0.5">
-                {querySafetyAlert.alternatives.map((alt, idx) => (
-                  <li key={idx}>{alt}</li>
-                ))}
-              </ul>
-            </div>
+            <p className="text-[10px] text-rose-100">{querySafetyAlert.reason}</p>
           </div>
         ) : (
           researchResult && (
-            <div className="rounded-2xl bg-slate-950 border border-emerald-500/40 p-3.5 space-y-2.5">
-              <div className="flex items-start justify-between gap-2 border-b border-white/10 pb-2">
-                <div>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 mb-1">
-                    <ShieldCheck className="w-3 h-3" />
-                    {researchResult.status}
-                  </span>
-                  <h4 className="text-xs font-black text-white">{researchResult.title}</h4>
-                </div>
+            <div className="rounded-xl bg-slate-950 border border-emerald-500/40 p-2.5 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-black text-white">{researchResult.name}</span>
+                <span className="px-2 py-0.5 rounded-full text-[8px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {researchResult.badge}
+                </span>
               </div>
 
-              <div className="space-y-1.5 text-[11px] leading-relaxed">
-                <div className="bg-slate-900/90 rounded-xl p-2 border border-white/10">
-                  <span className="text-[9px] font-black uppercase text-violet-300 block">
-                    Clinical Mechanism of Action
+              <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                <div className="bg-slate-900/90 rounded-lg p-1.5 border border-white/10">
+                  <span className="text-[8px] font-black uppercase text-violet-300 block">
+                    Goal
                   </span>
-                  <p className="text-slate-200">{researchResult.mechanism}</p>
+                  <span className="text-slate-200 font-semibold">
+                    {researchResult.primaryGoal}
+                  </span>
                 </div>
-
-                <div className="bg-slate-900/90 rounded-xl p-2 border border-white/10">
-                  <span className="text-[9px] font-black uppercase text-cyan-300 block">
-                    Metabolic &amp; Facial Tissue / Elastin Pathways
+                <div className="bg-slate-900/90 rounded-lg p-1.5 border border-white/10">
+                  <span className="text-[8px] font-black uppercase text-amber-300 block">
+                    Standard Dose
                   </span>
-                  <p className="text-slate-200">{researchResult.pathways}</p>
+                  <span className="text-slate-200 font-semibold">
+                    {researchResult.standardDose}
+                  </span>
                 </div>
-
-                <div className="bg-slate-900/90 rounded-xl p-2 border border-white/10">
-                  <span className="text-[9px] font-black uppercase text-amber-300 block">
-                    Research Dosage Context
+                <div className="bg-slate-900/90 rounded-lg p-1.5 border border-white/10">
+                  <span className="text-[8px] font-black uppercase text-cyan-300 block">
+                    Daily Support
                   </span>
-                  <p className="text-slate-200">{researchResult.dosageContext}</p>
+                  <span className="text-slate-200 font-semibold">
+                    {researchResult.keySupport}
+                  </span>
                 </div>
-
-                <div className="bg-emerald-950/50 rounded-xl p-2 border border-emerald-500/30">
-                  <span className="text-[9px] font-black uppercase text-emerald-300 block">
-                    Oncology &amp; NHL Remission Safety Profile
+                <div className="bg-emerald-950/50 rounded-lg p-1.5 border border-emerald-500/30">
+                  <span className="text-[8px] font-black uppercase text-emerald-300 block">
+                    Safety Status
                   </span>
-                  <p className="text-emerald-100">{researchResult.safetyProfile}</p>
+                  <span className="text-emerald-100 font-semibold">
+                    {researchResult.safetyStatus}
+                  </span>
                 </div>
               </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  handleAddClearedPeptideToCustomStack(
-                    researchResult.title,
-                    researchResult.defaultDose || '3 mg'
-                  )
-                }
-                className="w-full py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 shadow-md transition"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Start / Add to Custom Stack</span>
-              </button>
             </div>
           )
         )}
       </div>
 
-      {/* Logged Peptide Injection History with Full Edit & Delete CRUD */}
+      {/* Logged Injections History (Edit Pencil + Delete Trash) */}
       <div className="rounded-2xl border border-white/15 p-3 bg-slate-900/90 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-300">
-            Logged Injections ({peptideHistory.length}) — Edit or Delete Records
-          </span>
+        <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-300">
+          Logged Injections ({peptideHistory.length})
         </div>
 
         {peptideHistory.length === 0 ? (
-          <div className="text-xs text-slate-400 py-2 text-center">
-            No injections logged yet.
-          </div>
+          <div className="text-xs text-slate-400 py-2 text-center">No injections logged yet.</div>
         ) : (
-          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
             {peptideHistory.map((p) => {
               const isEditing = editingId === p.id;
               return (
                 <div
                   key={p.id}
-                  className="text-xs bg-slate-950 rounded-xl p-2.5 border border-white/15 space-y-2"
+                  className="text-xs bg-slate-950 rounded-xl p-2 border border-white/15 space-y-2"
                 >
                   {isEditing && editDraft ? (
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <div className="grid grid-cols-2 gap-1.5">
                         <input
                           type="text"
@@ -1011,10 +941,10 @@ export default function PeptideCalculator({ isOpen = true }) {
                         <button
                           type="button"
                           onClick={() => saveEditEntry(p.id)}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 text-[11px] font-black flex items-center gap-1"
+                          className="px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 font-black text-[10px] flex items-center gap-1"
                         >
                           <Check className="w-3 h-3" />
-                          <span>Save</span>
+                          Save
                         </button>
                         <button
                           type="button"
@@ -1022,36 +952,30 @@ export default function PeptideCalculator({ isOpen = true }) {
                             setEditingId(null);
                             setEditDraft(null);
                           }}
-                          className="px-2.5 py-1 rounded-lg bg-white/10 text-slate-300 text-[11px] font-bold flex items-center gap-1"
+                          className="px-2.5 py-1 rounded-lg bg-white/10 text-slate-300 font-bold text-[10px] flex items-center gap-1"
                         >
                           <X className="w-3 h-3" />
-                          <span>Cancel</span>
+                          Cancel
                         </button>
                       </div>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="font-black text-white truncate">{p.peptideName}</div>
-                        <div className="text-[11px] font-semibold text-violet-300">
-                          Dose: {p.desiredDoseValue}
+                        <div className="font-extrabold text-white truncate">
+                          {p.peptideName} • {p.desiredDoseValue}
                           {p.desiredDoseUnit}
-                          {p.syringeUnits
-                            ? ` • ${p.syringeUnits} U (${p.volumeMl} ml on ${
-                                p.syringeCapacityMl || 1.0
-                              } ml syringe)`
-                            : ''}
                         </div>
-                        <div className="text-[10px] text-slate-400 font-medium">
-                          Site: <strong className="text-slate-200">{p.site || GRANULAR_INJECTION_SITES[0]}</strong> •{' '}
-                          {p.timestamp}
+                        <div className="text-[10px] text-slate-400">
+                          Pull <strong className="text-violet-300">{p.syringeUnits}U</strong> (
+                          {p.volumeMl}ml) • {p.site} • {p.timestamp}
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
                           onClick={() => startEditEntry(p)}
-                          className="p-1.5 rounded-lg bg-white/10 border border-white/15 text-slate-300 hover:text-violet-300 transition"
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-cyan-300"
                           title="Edit Injection Record"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -1059,7 +983,7 @@ export default function PeptideCalculator({ isOpen = true }) {
                         <button
                           type="button"
                           onClick={() => deletePeptideEntry(p.id)}
-                          className="p-1.5 rounded-lg bg-white/10 border border-white/15 text-rose-400 hover:bg-rose-500/20 transition"
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400"
                           title="Delete Injection Record"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
