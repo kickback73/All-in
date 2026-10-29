@@ -1,111 +1,104 @@
 // src/components/UserProfileModal.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   X,
-  History,
+  User,
+  Calendar,
+  Archive,
   Trash2,
-  Edit2,
-  Check,
-  RotateCcw,
-  Droplets,
-  Utensils,
-  Syringe,
-  Activity,
+  ShieldCheck,
+  Save,
+  Upload,
+  HeartPulse,
+  CheckCircle2,
 } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
 
-export default function UserProfileModal({
-  isOpen,
-  onClose,
-  logs = [],
-  onUpdateLog,
-  onDeleteLog,
-  userProfile = {},
-  onUpdateUserProfile,
-  hydrationGoalMl = 2500,
-  onUpdateHydrationGoal,
-}) {
-  const [activeSubTab, setActiveSubTab] = useState('HISTORICAL_LOG'); // 'HISTORICAL_LOG' | 'BIOMETRICS'
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('ALL');
-  const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState({});
+const ACTIVITY_MULTIPLIERS = [
+  { value: 1.2, label: '1.20 — Sedentary / Recovery' },
+  { value: 1.375, label: '1.375 — Light Training (2–3x/wk Spin + Bands)' },
+  { value: 1.55, label: '1.55 — Moderate Athletic (4–5x/wk)' },
+  { value: 1.725, label: '1.725 — High Volume Recomp (6x/wk)' },
+  { value: 1.9, label: '1.90 — All-In Intensive Athlete' },
+];
 
-  const [profileForm, setProfileForm] = useState({
-    name: userProfile?.name || 'Dan',
-    heightDisplay: userProfile?.heightDisplay || "5'11\"",
-    weightLbs: userProfile?.weightLbs || 229,
-    targetWeightLbs: userProfile?.targetWeightLbs || 200,
-    dailyCaloricTarget: userProfile?.dailyCaloricTarget || 1900,
-    dailyProteinTarget: userProfile?.dailyProteinTarget || 180,
-    dailyCarbTarget: userProfile?.dailyCarbTarget || 145,
-    dailyFatTarget: userProfile?.dailyFatTarget || 65,
-    dailyStepsTarget: userProfile?.dailyStepsTarget || 10000,
-    dailyActiveMinutesTarget: userProfile?.dailyActiveMinutesTarget || 45,
-    activeProtocol: userProfile?.activeProtocol || 'Retatrutide 3 mg Weekly',
-    waterGoalMl: hydrationGoalMl || 2500,
-  });
+export default function UserProfileModal({ isOpen, onClose }) {
+  const {
+    userProfile,
+    setUserProfile,
+    dailyNutrition,
+    setDailyNutrition,
+    dailyHydration,
+    setDailyHydration,
+    historicalLogs,
+    setHistoricalLogs,
+    archiveDailyLog,
+    executePersistentSync,
+  } = useAppContext();
 
-  const filteredLogs = useMemo(() => {
-    return [...logs]
-      .filter((entry) => {
-        if (categoryFilter !== 'ALL' && entry.category !== categoryFilter) return false;
-        const entryDate = entry.timestamp ? entry.timestamp.slice(0, 10) : '';
-        if (startDate && entryDate < startDate) return false;
-        if (endDate && entryDate > endDate) return false;
-        return true;
-      })
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }, [logs, startDate, endDate, categoryFilter]);
+  const [activeTab, setActiveTab] = useState('profile');
+  const [savedNotice, setSavedNotice] = useState(false);
+  const fileInputRef = useRef(null);
 
   if (!isOpen) return null;
 
-  const startEditing = (entry) => {
-    setEditingId(entry.id);
-    setEditDraft({ ...entry });
+  const handleFacePhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setUserProfile((prev) => ({
+          ...prev,
+          customPhotoUrl: reader.result,
+        }));
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
-  const saveEdit = () => {
-    if (!editingId || !onUpdateLog) return;
-    onUpdateLog(editingId, editDraft);
-    setEditingId(null);
-    setEditDraft({});
+  const handleAgeChange = (newAge) => {
+    const parsedAge = Number(newAge) || 53;
+    setUserProfile((prev) => ({
+      ...prev,
+      age: parsedAge,
+      maxHr: Math.max(120, 220 - parsedAge),
+    }));
   };
 
-  const getCategoryIcon = (cat) => {
-    switch (cat) {
-      case 'WATER':
-        return <Droplets className="w-3.5 h-3.5 text-sky-600" />;
-      case 'NUTRITION':
-        return <Utensils className="w-3.5 h-3.5 text-teal-600" />;
-      case 'PEPTIDE':
-        return <Syringe className="w-3.5 h-3.5 text-indigo-600" />;
-      case 'ACTIVITY':
-        return <Activity className="w-3.5 h-3.5 text-emerald-600" />;
-      default:
-        return <History className="w-3.5 h-3.5 text-slate-600" />;
-    }
+  const handleSaveProfile = () => {
+    executePersistentSync('manual');
+    setSavedNotice(true);
+    setTimeout(() => setSavedNotice(false), 1800);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 text-slate-900">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
-        {/* Header Bar */}
-        <div className="px-4 py-3.5 bg-[#F4F8FB] border-b border-slate-200/80 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-2xl bg-sky-600 text-white">
-              <History className="w-4 h-4" />
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 overflow-y-auto">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden text-slate-900">
+        {/* Header */}
+        <div className="px-4 py-3.5 bg-[#F4F8FB] border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            {userProfile.customPhotoUrl ? (
+              <img
+                src={userProfile.customPhotoUrl}
+                alt={userProfile.name}
+                className="w-9 h-9 rounded-full object-cover border-2 border-sky-600 shadow-xs"
+              />
+            ) : (
+              <div className="p-2 rounded-2xl bg-sky-600 text-white">
+                <User className="w-4 h-4" />
+              </div>
+            )}
             <div>
               <h2 className="text-sm font-black text-slate-900">
-                Historical Log & Full App Editor
+                All-In Athlete Profile &amp; Logs
               </h2>
               <p className="text-[11px] text-slate-500">
-                Edit any past entry, daily goal, macro target, or biometric
+                {userProfile.name} • Age {userProfile.age || 53} • {userProfile.height} •{' '}
+                {userProfile.weightLbs} lbs → {userProfile.goalWeightLbs} lbs
               </p>
             </div>
           </div>
-
           <button
             type="button"
             onClick={onClose}
@@ -115,418 +108,374 @@ export default function UserProfileModal({
           </button>
         </div>
 
-        {/* Sub-Tab Selector */}
-        <div className="px-4 pt-3 bg-white flex gap-2">
+        {/* Tabs */}
+        <div className="grid grid-cols-2 bg-slate-100 p-1 m-3 rounded-2xl">
           <button
             type="button"
-            onClick={() => setActiveSubTab('HISTORICAL_LOG')}
-            className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition ${
-              activeSubTab === 'HISTORICAL_LOG'
-                ? 'bg-sky-600 text-white border-sky-600'
-                : 'bg-[#F4F8FB] text-slate-700 border-slate-200'
+            onClick={() => setActiveTab('profile')}
+            className={`py-1.5 rounded-xl text-xs font-extrabold transition ${
+              activeTab === 'profile'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600'
             }`}
           >
-            Historical Logs ({logs.length})
+            All-In Athlete Profile
           </button>
           <button
             type="button"
-            onClick={() => setActiveSubTab('BIOMETRICS')}
-            className={`flex-1 py-2 rounded-xl text-xs font-extrabold border transition ${
-              activeSubTab === 'BIOMETRICS'
-                ? 'bg-sky-600 text-white border-sky-600'
-                : 'bg-[#F4F8FB] text-slate-700 border-slate-200'
+            onClick={() => setActiveTab('history')}
+            className={`py-1.5 rounded-xl text-xs font-extrabold transition ${
+              activeTab === 'history'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600'
             }`}
           >
-            Edit All Targets & Profile
+            Historical Logs ({historicalLogs.length})
           </button>
         </div>
 
-        {activeSubTab === 'HISTORICAL_LOG' && (
-          <>
-            {/* Filter Controls */}
-            <div className="p-3 border-b border-slate-100 bg-white grid grid-cols-3 gap-2">
-              <div>
-                <label className="block text-[9px] font-extrabold uppercase text-slate-500">
-                  From
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold"
-                />
+        <div className="p-4 pt-1 overflow-y-auto space-y-3">
+          {activeTab === 'profile' ? (
+            <>
+              <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3 flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                <div className="text-[11px] text-emerald-900">
+                  <strong>Remission Safeguard Active:</strong> {userProfile.remissionStatus}. Active Protocol: {userProfile.activeProtocol}.
+                </div>
               </div>
-              <div>
-                <label className="block text-[9px] font-extrabold uppercase text-slate-500">
-                  To
-                </label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[9px] font-extrabold uppercase text-slate-500">
-                  Category
-                </label>
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-bold bg-white"
-                >
-                  <option value="ALL">All ({logs.length})</option>
-                  <option value="WATER">Water</option>
-                  <option value="NUTRITION">Nutrition</option>
-                  <option value="PEPTIDE">Peptides</option>
-                  <option value="ACTIVITY">Activity</option>
-                </select>
-              </div>
-            </div>
 
-            <div className="p-4 overflow-y-auto flex-1 space-y-2.5">
-              {filteredLogs.length === 0 ? (
-                <div className="text-center py-10 rounded-2xl border border-dashed border-slate-200 bg-[#F4F8FB]/50">
-                  <p className="text-xs font-extrabold text-slate-700">No records in this range.</p>
+              {/* Athlete Face Avatar Upload Card */}
+              <div className="rounded-2xl bg-[#F4F8FB] border border-slate-200 p-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  {userProfile.customPhotoUrl ? (
+                    <img
+                      src={userProfile.customPhotoUrl}
+                      alt={userProfile.name}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-sky-600"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-sky-100 border border-sky-300 flex items-center justify-center text-sky-700">
+                      <User className="w-6 h-6" />
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-xs font-black text-slate-900">
+                      Athlete Face Avatar
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      Displays in the upper navigation bar
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFacePhotoUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-extrabold flex items-center gap-1"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Photo</span>
+                  </button>
+                  {userProfile.customPhotoUrl && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setUserProfile((prev) => ({ ...prev, customPhotoUrl: '' }))
+                      }
+                      className="p-1.5 rounded-xl bg-white border border-slate-200 text-rose-600 hover:bg-rose-50"
+                      title="Remove Avatar"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Core Athlete Metrics Grid */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                    Athlete Name
+                  </label>
+                  <input
+                    type="text"
+                    value={userProfile.name}
+                    onChange={(e) =>
+                      setUserProfile((p) => ({ ...p, name: e.target.value }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                    Age (Years)
+                  </label>
+                  <input
+                    type="number"
+                    value={userProfile.age || 53}
+                    onChange={(e) => handleAgeChange(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                    Height
+                  </label>
+                  <input
+                    type="text"
+                    value={userProfile.height}
+                    onChange={(e) =>
+                      setUserProfile((p) => ({ ...p, height: e.target.value }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                    Weight (lbs)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={userProfile.weightLbs}
+                    onChange={(e) =>
+                      setUserProfile((p) => ({
+                        ...p,
+                        weightLbs: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                    Goal (lbs)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={userProfile.goalWeightLbs}
+                    onChange={(e) =>
+                      setUserProfile((p) => ({
+                        ...p,
+                        goalWeightLbs: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1 flex items-center gap-1">
+                    <HeartPulse className="w-3 h-3 text-rose-500" />
+                    <span>Max HR</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={userProfile.maxHr || 220 - (userProfile.age || 53)}
+                    onChange={(e) =>
+                      setUserProfile((p) => ({
+                        ...p,
+                        maxHr: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-rose-700"
+                  />
+                </div>
+              </div>
+
+              {/* Activity Multiplier & Dietary Focus */}
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                    Activity Multiplier
+                  </label>
+                  <select
+                    value={userProfile.activityMultiplier || 1.375}
+                    onChange={(e) =>
+                      setUserProfile((p) => ({
+                        ...p,
+                        activityMultiplier: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold"
+                  >
+                    {ACTIVITY_MULTIPLIERS.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                    Dietary Focus &amp; Clinical Protocol
+                  </label>
+                  <input
+                    type="text"
+                    value={userProfile.dietaryFocus || ''}
+                    onChange={(e) =>
+                      setUserProfile((p) => ({
+                        ...p,
+                        dietaryFocus: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Daily Targets */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                    Kcal Target
+                  </label>
+                  <input
+                    type="number"
+                    value={dailyNutrition.targetCalories}
+                    onChange={(e) =>
+                      setDailyNutrition((p) => ({
+                        ...p,
+                        targetCalories: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                    Protein (g)
+                  </label>
+                  <input
+                    type="number"
+                    value={dailyNutrition.targetProtein}
+                    onChange={(e) =>
+                      setDailyNutrition((p) => ({
+                        ...p,
+                        targetProtein: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">
+                    Water (ml)
+                  </label>
+                  <input
+                    type="number"
+                    value={dailyHydration.targetMl}
+                    onChange={(e) =>
+                      setDailyHydration((p) => ({
+                        ...p,
+                        targetMl: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold"
+                  />
+                </div>
+              </div>
+
+              {savedNotice && (
+                <div className="rounded-xl bg-emerald-50 border border-emerald-300 p-2 text-emerald-900 text-xs font-bold flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Athlete profile saved &amp; synced!</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSaveProfile}
+                  className="py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-black flex items-center justify-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Athlete Profile</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={archiveDailyLog}
+                  className="py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black flex items-center justify-center gap-1.5"
+                >
+                  <Archive className="w-4 h-4" />
+                  <span>Archive Today</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-2.5">
+              {historicalLogs.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-500">
+                  No archived daily snapshots yet. Automatic sync runs on launch and every midnight (`00:00:00`).
                 </div>
               ) : (
-                filteredLogs.map((entry) => {
-                  const isEditing = editingId === entry.id;
-                  return (
-                    <div
-                      key={entry.id}
-                      className="rounded-2xl border border-slate-200 p-3 bg-white shadow-2xs space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-sky-50 text-sky-800 border border-sky-200 flex items-center gap-1">
-                          {getCategoryIcon(entry.category)}
-                          <span>{entry.category}</span>
+                historicalLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="rounded-2xl border border-slate-200 p-3 bg-[#F4F8FB] space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-900 flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-sky-600" />
+                        {log.date}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-slate-700">
+                          {log.weightLbs} lbs
                         </span>
-                        <span className="text-[10px] font-semibold text-slate-500">
-                          {new Date(entry.timestamp).toLocaleString()}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setHistoricalLogs((prev) =>
+                              prev.filter((item) => item.id !== log.id)
+                            )
+                          }
+                          className="text-rose-500 hover:text-rose-700"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-
-                      {!isEditing ? (
-                        <div className="flex items-center justify-between gap-2">
-                          <div>
-                            <div className="text-xs font-extrabold text-slate-900">{entry.title}</div>
-                            <div className="text-[11px] text-slate-600">{entry.summary}</div>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => startEditing(entry)}
-                              className="p-1.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onDeleteLog && onDeleteLog(entry.id)}
-                              className="p-1.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-2 pt-1">
-                          <input
-                            type="text"
-                            value={editDraft.title || ''}
-                            onChange={(e) => setEditDraft((d) => ({ ...d, title: e.target.value }))}
-                            className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-bold"
-                          />
-                          <div className="grid grid-cols-3 gap-2">
-                            {entry.category === 'WATER' && (
-                              <input
-                                type="number"
-                                value={editDraft.amountMl || 0}
-                                onChange={(e) => {
-                                  const amountMl = Number(e.target.value);
-                                  setEditDraft((d) => ({
-                                    ...d,
-                                    amountMl,
-                                    summary: `${amountMl} ml water intake`,
-                                  }));
-                                }}
-                                className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-bold"
-                              />
-                            )}
-                            {entry.category === 'NUTRITION' && (
-                              <>
-                                <input
-                                  type="number"
-                                  placeholder="Kcal"
-                                  value={editDraft.calories || 0}
-                                  onChange={(e) => {
-                                    const calories = Number(e.target.value);
-                                    setEditDraft((d) => ({
-                                      ...d,
-                                      calories,
-                                      summary: `${calories} kcal • ${d.protein || 0}g P`,
-                                    }));
-                                  }}
-                                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-bold"
-                                />
-                                <input
-                                  type="number"
-                                  placeholder="Protein"
-                                  value={editDraft.protein || 0}
-                                  onChange={(e) => {
-                                    const protein = Number(e.target.value);
-                                    setEditDraft((d) => ({
-                                      ...d,
-                                      protein,
-                                      summary: `${d.calories || 0} kcal • ${protein}g P`,
-                                    }));
-                                  }}
-                                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-bold"
-                                />
-                              </>
-                            )}
-                            {entry.category === 'PEPTIDE' && (
-                              <>
-                                <input
-                                  type="number"
-                                  placeholder="Dose mcg"
-                                  value={editDraft.doseMcg || 0}
-                                  onChange={(e) => {
-                                    const doseMcg = Number(e.target.value);
-                                    setEditDraft((d) => ({
-                                      ...d,
-                                      doseMcg,
-                                      summary: `${doseMcg} mcg • ${d.site || 'SubQ'}`,
-                                    }));
-                                  }}
-                                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-bold"
-                                />
-                                <input
-                                  type="text"
-                                  placeholder="Site"
-                                  value={editDraft.site || ''}
-                                  onChange={(e) =>
-                                    setEditDraft((d) => ({ ...d, site: e.target.value }))
-                                  }
-                                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-bold"
-                                />
-                              </>
-                            )}
-                            {entry.category === 'ACTIVITY' && (
-                              <>
-                                <input
-                                  type="number"
-                                  placeholder="Mins"
-                                  value={editDraft.durationMin || 0}
-                                  onChange={(e) => {
-                                    const durationMin = Number(e.target.value);
-                                    setEditDraft((d) => ({
-                                      ...d,
-                                      durationMin,
-                                      summary: `${durationMin} mins • ${d.steps || 0} steps`,
-                                    }));
-                                  }}
-                                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-bold"
-                                />
-                                <input
-                                  type="number"
-                                  placeholder="Steps"
-                                  value={editDraft.steps || 0}
-                                  onChange={(e) => {
-                                    const steps = Number(e.target.value);
-                                    setEditDraft((d) => ({
-                                      ...d,
-                                      steps,
-                                      summary: `${d.durationMin || 0} mins • ${steps} steps`,
-                                    }));
-                                  }}
-                                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-bold"
-                                />
-                              </>
-                            )}
-                          </div>
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={saveEdit}
-                              className="px-3 py-1 rounded-full text-xs font-extrabold text-white bg-emerald-600"
-                            >
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditingId(null)}
-                              className="px-3 py-1 rounded-full text-xs font-bold text-slate-600"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  );
-                })
+                    <div className="grid grid-cols-4 gap-1.5 text-center text-[10px]">
+                      <div className="bg-white rounded-lg p-1 border border-slate-200">
+                        <div className="text-slate-400 font-bold">Kcal</div>
+                        <div className="font-black text-slate-900">
+                          {log.nutrition?.calories || 0}
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-1 border border-slate-200">
+                        <div className="text-slate-400 font-bold">Protein</div>
+                        <div className="font-black text-sky-700">
+                          {log.nutrition?.protein || 0}g
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-1 border border-slate-200">
+                        <div className="text-slate-400 font-bold">Water</div>
+                        <div className="font-black text-cyan-700">
+                          {log.hydration?.currentMl || 0}ml
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-1 border border-slate-200">
+                        <div className="text-slate-400 font-bold">Burned</div>
+                        <div className="font-black text-emerald-700">
+                          {log.activity?.caloriesBurned || 0} kcal
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
-          </>
-        )}
-
-        {activeSubTab === 'BIOMETRICS' && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (onUpdateUserProfile) onUpdateUserProfile(profileForm);
-              if (onUpdateHydrationGoal) onUpdateHydrationGoal(Number(profileForm.waterGoalMl) || 2500);
-              onClose();
-            }}
-            className="p-4 overflow-y-auto space-y-3"
-          >
-            <div className="grid grid-cols-2 gap-2.5">
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-600">Name</label>
-                <input
-                  type="text"
-                  value={profileForm.name}
-                  onChange={(e) => setProfileForm((p) => ({ ...p, name: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-600">Height</label>
-                <input
-                  type="text"
-                  value={profileForm.heightDisplay}
-                  onChange={(e) => setProfileForm((p) => ({ ...p, heightDisplay: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-600">
-                  Current Weight (lbs)
-                </label>
-                <input
-                  type="number"
-                  value={profileForm.weightLbs}
-                  onChange={(e) =>
-                    setProfileForm((p) => ({ ...p, weightLbs: Number(e.target.value) }))
-                  }
-                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-600">
-                  Goal Weight (lbs)
-                </label>
-                <input
-                  type="number"
-                  value={profileForm.targetWeightLbs}
-                  onChange={(e) =>
-                    setProfileForm((p) => ({ ...p, targetWeightLbs: Number(e.target.value) }))
-                  }
-                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-600">
-                  Daily Energy Target (kcal)
-                </label>
-                <input
-                  type="number"
-                  value={profileForm.dailyCaloricTarget}
-                  onChange={(e) =>
-                    setProfileForm((p) => ({ ...p, dailyCaloricTarget: Number(e.target.value) }))
-                  }
-                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-600">
-                  Daily Protein Target (g)
-                </label>
-                <input
-                  type="number"
-                  value={profileForm.dailyProteinTarget}
-                  onChange={(e) =>
-                    setProfileForm((p) => ({ ...p, dailyProteinTarget: Number(e.target.value) }))
-                  }
-                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-600">
-                  Daily Carbs Target (g)
-                </label>
-                <input
-                  type="number"
-                  value={profileForm.dailyCarbTarget}
-                  onChange={(e) =>
-                    setProfileForm((p) => ({ ...p, dailyCarbTarget: Number(e.target.value) }))
-                  }
-                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-600">
-                  Daily Fats Target (g)
-                </label>
-                <input
-                  type="number"
-                  value={profileForm.dailyFatTarget}
-                  onChange={(e) =>
-                    setProfileForm((p) => ({ ...p, dailyFatTarget: Number(e.target.value) }))
-                  }
-                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-600">
-                  Daily Hydration Target (ml)
-                </label>
-                <input
-                  type="number"
-                  value={profileForm.waterGoalMl}
-                  onChange={(e) =>
-                    setProfileForm((p) => ({ ...p, waterGoalMl: Number(e.target.value) }))
-                  }
-                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-600">
-                  Daily Steps Target
-                </label>
-                <input
-                  type="number"
-                  value={profileForm.dailyStepsTarget}
-                  onChange={(e) =>
-                    setProfileForm((p) => ({ ...p, dailyStepsTarget: Number(e.target.value) }))
-                  }
-                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-600">
-                Active Weekly Peptide Protocol
-              </label>
-              <input
-                type="text"
-                value={profileForm.activeProtocol}
-                onChange={(e) => setProfileForm((p) => ({ ...p, activeProtocol: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-2.5 rounded-2xl text-xs font-extrabold text-white bg-sky-600 hover:bg-sky-700 transition cursor-pointer"
-            >
-              Save All Targets & Profile Settings
-            </button>
-          </form>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

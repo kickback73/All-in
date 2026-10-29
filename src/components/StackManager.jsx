@@ -27,6 +27,8 @@ const createEmptyIngredient = () => ({
   calories: 0,
   protein: 0,
   carbs: 0,
+  fiber: 0,
+  netCarbs: 0,
   fats: 0,
   waterMl: 0,
   micros: { vitaminD: 0, vitaminC: 0, magnesium: 0, zinc: 0, potassium: 0, sodium: 0 },
@@ -49,6 +51,7 @@ export function calculateStackTotals(ingredients = []) {
       acc.calories += Number(ing.calories) || 0;
       acc.protein += Number(ing.protein) || 0;
       acc.carbs += Number(ing.carbs) || 0;
+      acc.fiber += Number(ing.fiber) || 0;
       acc.fats += Number(ing.fats) || 0;
       acc.waterMl += Number(ing.waterMl) || 0;
 
@@ -63,6 +66,8 @@ export function calculateStackTotals(ingredients = []) {
       acc.calories = Math.round(acc.calories);
       acc.protein = Math.round(acc.protein * 10) / 10;
       acc.carbs = Math.round(acc.carbs * 10) / 10;
+      acc.fiber = Math.round(acc.fiber * 10) / 10;
+      acc.netCarbs = Math.max(0, Math.round((acc.carbs - acc.fiber) * 10) / 10);
       acc.fats = Math.round(acc.fats * 10) / 10;
       return acc;
     },
@@ -70,6 +75,8 @@ export function calculateStackTotals(ingredients = []) {
       calories: 0,
       protein: 0,
       carbs: 0,
+      fiber: 0,
+      netCarbs: 0,
       fats: 0,
       waterMl: 0,
       micros: { vitaminD: 0, vitaminC: 0, magnesium: 0, zinc: 0, potassium: 0, sodium: 0 },
@@ -173,10 +180,16 @@ export default function StackManager({
             },
           };
         }
-        return {
+        const updated = {
           ...ing,
           [field]: value,
         };
+        if (field === 'carbs' || field === 'fiber') {
+          const c = Number(field === 'carbs' ? value : updated.carbs) || 0;
+          const f = Number(field === 'fiber' ? value : updated.fiber) || 0;
+          updated.netCarbs = Math.max(0, Math.round((c - f) * 10) / 10);
+        }
+        return updated;
       })
     );
   };
@@ -233,10 +246,10 @@ export default function StackManager({
             </div>
             <div>
               <h2 className="text-sm font-black text-slate-900">
-                {editingStackId ? 'Edit Stack' : 'Stack Builder (Auto-Verified Nutrients)'}
+                {editingStackId ? 'Edit Stack' : 'Morning Stack & Protocol Builder'}
               </h2>
               <p className="text-[11px] text-slate-500">
-                USDA FoodData Central & OpenFoodFacts auto-population
+                USDA FoodData Central & Verified Baseline Dictionary
               </p>
             </div>
           </div>
@@ -259,7 +272,7 @@ export default function StackManager({
             </div>
           )}
 
-          {/* Saved Stacks List (Tap to Log, Edit, or Delete) */}
+          {/* Saved Stacks List */}
           {stacks.length > 0 && (
             <div className="space-y-2">
               <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
@@ -275,7 +288,8 @@ export default function StackManager({
                       <div className="font-extrabold text-slate-900 text-xs truncate">{s.name}</div>
                       <div className="text-[11px] font-semibold text-slate-600">
                         {s.totals?.calories || 0} kcal • {s.totals?.protein || 0}g P •{' '}
-                        {s.totals?.waterMl || 0}ml H2O • Leu: {s.totals?.aminos?.leucine || 0}mg
+                        {s.totals?.netCarbs ?? s.totals?.carbs ?? 0}g Net C •{' '}
+                        {s.totals?.waterMl || 0}ml H2O
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -324,25 +338,29 @@ export default function StackManager({
                 Leu: {leucineGrams}g • Met: {methionineGrams}g
               </span>
             </div>
-            <div className="grid grid-cols-5 gap-1.5 text-center">
+            <div className="grid grid-cols-6 gap-1 text-center">
               <div className="bg-white rounded-xl p-1.5 border border-slate-200/80">
-                <div className="text-[9px] text-slate-500 font-bold">Kcal</div>
+                <div className="text-[8px] text-slate-500 font-bold">Kcal</div>
                 <div className="text-xs font-black text-slate-900">{liveTotals.calories}</div>
               </div>
               <div className="bg-white rounded-xl p-1.5 border border-slate-200/80">
-                <div className="text-[9px] text-slate-500 font-bold">Protein</div>
+                <div className="text-[8px] text-slate-500 font-bold">Protein</div>
                 <div className="text-xs font-black text-sky-700">{liveTotals.protein}g</div>
               </div>
               <div className="bg-white rounded-xl p-1.5 border border-slate-200/80">
-                <div className="text-[9px] text-slate-500 font-bold">Carbs</div>
+                <div className="text-[8px] text-slate-500 font-bold">Carbs</div>
                 <div className="text-xs font-black text-teal-700">{liveTotals.carbs}g</div>
               </div>
               <div className="bg-white rounded-xl p-1.5 border border-slate-200/80">
-                <div className="text-[9px] text-slate-500 font-bold">Fats</div>
+                <div className="text-[8px] text-slate-500 font-bold">Net Carb</div>
+                <div className="text-xs font-black text-emerald-700">{liveTotals.netCarbs}g</div>
+              </div>
+              <div className="bg-white rounded-xl p-1.5 border border-slate-200/80">
+                <div className="text-[8px] text-slate-500 font-bold">Fats</div>
                 <div className="text-xs font-black text-indigo-700">{liveTotals.fats}g</div>
               </div>
               <div className="bg-white rounded-xl p-1.5 border border-slate-200/80">
-                <div className="text-[9px] text-slate-500 font-bold">Water</div>
+                <div className="text-[8px] text-slate-500 font-bold">Water</div>
                 <div className="text-xs font-black text-cyan-700">{liveTotals.waterMl}ml</div>
               </div>
             </div>
@@ -393,7 +411,7 @@ export default function StackManager({
                       onChange={(e) => handleQuickPresetSelect(ing.id, e.target.value)}
                       className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-800"
                     >
-                      <option value="">⚡ Quick Select Verified Item...</option>
+                      <option value="">⚡ Quick Select Verified Staple...</option>
                       {VERIFIED_NUTRIENT_DATABASE.map((dbItem, dbIdx) => (
                         <option key={dbIdx} value={dbIdx}>
                           {dbItem.label.split(' (')[0]} ({dbItem.defaultServingGrams}g/ml)
@@ -413,40 +431,46 @@ export default function StackManager({
                     )}
                   </div>
 
-                  {/* Ingredient Search / Auto-Populate Row */}
+                  {/* Ingredient Search / Enter / Lookup Row */}
                   <div className="flex gap-1.5">
                     <input
                       type="text"
                       required
                       value={ing.name}
                       onChange={(e) => handleIngredientChange(ing.id, 'name', e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAutoPopulateIngredient(ing);
+                        }
+                      }}
                       onBlur={() => {
                         if (!ing.source && ing.name.trim()) {
                           handleAutoPopulateIngredient(ing);
                         }
                       }}
-                      placeholder="Type food (e.g. 1 tbsp bovine collagen, 150g salmon)..."
+                      placeholder="Type food (e.g. Banana, Oats, White Fish, Eggs) & press Enter..."
                       className="flex-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-900"
                     />
                     <button
                       type="button"
                       onClick={() => handleAutoPopulateIngredient(ing)}
                       disabled={loadingIngId === ing.id}
-                      className="px-2.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-extrabold flex items-center gap-1 shrink-0 cursor-pointer"
-                      title="Auto-populate verified USDA / OpenFoodFacts nutrients"
+                      className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-extrabold flex items-center gap-1 shrink-0 cursor-pointer"
+                      title="Lookup and auto-populate verified USDA / OpenFoodFacts nutrients"
                     >
                       <Search className="w-3 h-3" />
-                      <span>{loadingIngId === ing.id ? '...' : 'Auto-Fill'}</span>
+                      <span>{loadingIngId === ing.id ? '...' : 'Enter / Lookup'}</span>
                     </button>
                   </div>
 
                   {ing.source && (
                     <div className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-                      ✓ Verified Source: {ing.source}
+                      ✓ {ing.source}
                     </div>
                   )}
 
-                  {/* Editable Grams/ml + Macros + Leucine/Methionine */}
+                  {/* Editable Grams/ml + Macros (including Total Carbs, Fiber, Net Carbs, Fats) */}
                   <div className="grid grid-cols-6 gap-1.5">
                     <div>
                       <label className="block text-[9px] font-bold text-slate-500">Amt (g/ml)</label>
@@ -487,24 +511,22 @@ export default function StackManager({
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-500">Leu (mg)</label>
+                      <label className="block text-[9px] font-bold text-slate-500">Net C (g)</label>
                       <input
                         type="number"
-                        value={ing.aminos?.leucine || 0}
-                        onChange={(e) =>
-                          handleIngredientChange(ing.id, 'leucine', e.target.value, 'aminos')
-                        }
-                        className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs font-bold"
+                        step="0.1"
+                        value={ing.netCarbs ?? Math.max(0, (Number(ing.carbs) || 0) - (Number(ing.fiber) || 0))}
+                        readOnly
+                        className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-1.5 py-1 text-xs font-black text-emerald-800"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-bold text-slate-500">Met (mg)</label>
+                      <label className="block text-[9px] font-bold text-slate-500">Fat (g)</label>
                       <input
                         type="number"
-                        value={ing.aminos?.methionine || 0}
-                        onChange={(e) =>
-                          handleIngredientChange(ing.id, 'methionine', e.target.value, 'aminos')
-                        }
+                        step="0.1"
+                        value={ing.fats}
+                        onChange={(e) => handleIngredientChange(ing.id, 'fats', e.target.value)}
                         className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs font-bold"
                       />
                     </div>

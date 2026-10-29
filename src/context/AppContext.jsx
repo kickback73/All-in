@@ -1,331 +1,487 @@
 // src/context/AppContext.jsx
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  DEFAULT_MORNING_STACKS,
-  INITIAL_PEPTIDE_HISTORY,
-  DAILY_TARGETS,
-  ESSENTIAL_AMINO_ACIDS,
-  MICRONUTRIENT_FIELDS,
-} from '../data/initialData';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { VISUAL_ASSET_LIBRARY } from '../utils/backgroundEngine';
 import { DANS_MORNING_STACK } from '../utils/nutrientEngine';
-import {
-  loadStoredState,
-  saveStoredState,
-} from '../utils/syncService';
-import { feedbackEngine } from '../utils/soundEffects';
-import { getActiveCycleDateKey } from '../utils/backgroundEngine';
 
-const AppContext = createContext(null);
+const AppContext = createContext();
 
-export function AppProvider({ children }) {
-  const [isLoaded, setIsLoaded] = useState(false);
+const INITIAL_NUTRITION = {
+  calories: 0,
+  targetCalories: 1900, // 1,850–1,950 kcal/day (calibrated to preserve facial fat pads and lean tissue)
+  protein: 0,
+  targetProtein: 180, // 170–190 g/day
+  carbs: 0,
+  targetCarbs: 140,
+  fiber: 0,
+  targetFiber: 32,
+  netCarbs: 0,
+  fats: 0,
+  targetFats: 65,
+  meals: [],
+  micros: {
+    vitaminD: 0,
+    vitaminC: 0,
+    magnesium: 0,
+    zinc: 0,
+    potassium: 0,
+    sodium: 0,
+  },
+  aminos: {
+    leucine: 0,
+    isoleucine: 0,
+    valine: 0,
+    lysine: 0,
+    methionine: 0,
+    phenylalanine: 0,
+    threonine: 0,
+    tryptophan: 0,
+    histidine: 0,
+  },
+};
 
-  // Calibrated to Dans Health Journey.md: Male, 5'11", 229 lbs -> 200 lbs, 1850-1950 kcal, 170-190g Protein
-  const [userProfile, setUserProfile] = useState({
-    name: 'Dan',
-    sex: 'Male',
-    heightDisplay: "5'11\"",
-    weightLbs: 229,
-    targetWeightLbs: 200,
-    dailyCaloricTarget: 1900,
-    dailyProteinTarget: 180,
-    dailyCarbTarget: 145,
-    dailyFatTarget: 65,
-    dailyStepsTarget: 10000,
-    dailyActiveMinutesTarget: 45,
-    dailyActiveCaloriesTarget: 500,
-    activeProtocol: 'Retatrutide 3 mg Weekly',
-    customPhotoUrl: null,
-    selectedAvatarId: 'hero-power',
+const INITIAL_HYDRATION = {
+  currentMl: 0,
+  targetMl: 3250,
+  electrolytePackets: 0,
+  creatineGrams: 0,
+};
+
+const INITIAL_ACTIVITY = {
+  steps: 4200,
+  targetSteps: 8500,
+  activeMinutes: 35,
+  targetActiveMinutes: 45,
+  caloriesBurned: 245,
+  workoutType: 'Spin Bike (Zone 2) + Resistance Bands + Ab Wheel',
+  trainingLogs: [
+    {
+      id: 'init_spin_1',
+      type: 'Spin Bike',
+      summary: '25 min • 114 BPM (Zone 2 Fat Burn)',
+      calories: 185,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    },
+    {
+      id: 'init_bands_1',
+      type: 'Resistance Bands',
+      summary: 'Back/V-Taper • 60 lbs × 12 reps × 3 sets',
+      calories: 42,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    },
+    {
+      id: 'init_ab_1',
+      type: 'Ab Wheel Rollouts',
+      summary: 'Kneeling • 229 lbs • 12 reps × 3 sets',
+      calories: 18,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    },
+  ],
+};
+
+const INITIAL_PEPTIDE_HISTORY = [
+  {
+    id: 'pep_dan_retatrutide_1',
+    peptideName: 'Retatrutide (GLP-1/GIP/GCGR)',
+    vialMg: 10,
+    bacWaterMl: 2,
+    desiredDoseValue: 3,
+    desiredDoseUnit: 'mg',
+    volumeMl: '0.600',
+    syringeUnits: '60.0',
+    site: 'Abdomen (Periumbilical, left/right)',
+    dateTime: new Date().toISOString().slice(0, 16),
+    timestamp: new Date().toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+  },
+];
+
+export const AppProvider = ({ children }) => {
+  const [userProfile, setUserProfile] = useState(() => {
+    const saved = localStorage.getItem('allIn_userProfile_v5');
+    return saved
+      ? JSON.parse(saved)
+      : {
+          name: 'Dan',
+          sex: 'Male',
+          age: 53,
+          height: '5\'11"',
+          weightLbs: 229,
+          goalWeightLbs: 200,
+          maxHr: 167, // 220 - 53
+          activityMultiplier: 1.375,
+          dietaryFocus: 'High-Protein Recomp • Facial Fat Pad Preservation • NHL Remission Safe',
+          remissionStatus: 'NHL Remission (Strict Anti-Angiogenic Guardrail)',
+          activeProtocol: 'Retatrutide 3 mg once weekly',
+          selectedPhotoId: VISUAL_ASSET_LIBRARY[0].id,
+          customPhotoUrl: '',
+        };
   });
 
-  const [hydrationGoalMl, setHydrationGoalMl] = useState(DAILY_TARGETS.waterMl || 2500);
-  const [morningStacks, setMorningStacks] = useState(DEFAULT_MORNING_STACKS);
-  const [peptideHistory, setPeptideHistory] = useState(INITIAL_PEPTIDE_HISTORY);
-  const [universalLogs, setUniversalLogs] = useState([]);
-  const [activeCycleKey, setActiveCycleKey] = useState(() => getActiveCycleDateKey());
-
-  const [todayLog, setTodayLog] = useState({
-    date: getActiveCycleDateKey(),
-    meals: [],
-    stacksLogged: [],
-    workouts: [],
-    waterMl: 0,
-    steps: 0,
-    activeMinutes: 0,
-    activeCalories: 0,
-    lastModified: new Date().toISOString(),
+  const [dailyNutrition, setDailyNutrition] = useState(() => {
+    const saved = localStorage.getItem('allIn_dailyNutrition_v5');
+    return saved ? JSON.parse(saved) : INITIAL_NUTRITION;
   });
 
-  // Load from LocalStorage on mount
+  const [dailyHydration, setDailyHydration] = useState(() => {
+    const saved = localStorage.getItem('allIn_dailyHydration_v5');
+    return saved ? JSON.parse(saved) : INITIAL_HYDRATION;
+  });
+
+  const [dailyActivity, setDailyActivity] = useState(() => {
+    const saved = localStorage.getItem('allIn_dailyActivity_v5');
+    return saved ? JSON.parse(saved) : INITIAL_ACTIVITY;
+  });
+
+  const [savedStacks, setSavedStacks] = useState(() => {
+    const saved = localStorage.getItem('allIn_savedStacks_v5');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+    return [DANS_MORNING_STACK];
+  });
+
+  const [peptideHistory, setPeptideHistory] = useState(() => {
+    const saved = localStorage.getItem('allIn_peptideHistory_v5');
+    return saved ? JSON.parse(saved) : INITIAL_PEPTIDE_HISTORY;
+  });
+
+  const [historicalLogs, setHistoricalLogs] = useState(() => {
+    const saved = localStorage.getItem('allIn_historicalLogs_v5');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [mtorState, setMtorState] = useState(() => {
+    const saved = localStorage.getItem('allIn_mtorState_v5');
+    return saved
+      ? JSON.parse(saved)
+      : {
+          mode: 'Autophagy / AMPK',
+          fastingHours: 14,
+          postWorkoutWindow: false,
+          leucineTriggerGrams: 0,
+        };
+  });
+
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [syncStatusBadge, setSyncStatusBadge] = useState('Syncing...');
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+
+  // Persist all state slices
   useEffect(() => {
-    const cached = loadStoredState();
-    if (cached) {
-      if (cached.todayLog) setTodayLog(cached.todayLog);
-      if (Array.isArray(cached.morningStacks) && cached.morningStacks.length > 0) {
-        setMorningStacks(cached.morningStacks);
+    localStorage.setItem('allIn_userProfile_v5', JSON.stringify(userProfile));
+  }, [userProfile]);
+
+  useEffect(() => {
+    localStorage.setItem('allIn_dailyNutrition_v5', JSON.stringify(dailyNutrition));
+  }, [dailyNutrition]);
+
+  useEffect(() => {
+    localStorage.setItem('allIn_dailyHydration_v5', JSON.stringify(dailyHydration));
+  }, [dailyHydration]);
+
+  useEffect(() => {
+    localStorage.setItem('allIn_dailyActivity_v5', JSON.stringify(dailyActivity));
+  }, [dailyActivity]);
+
+  useEffect(() => {
+    localStorage.setItem('allIn_savedStacks_v5', JSON.stringify(savedStacks));
+  }, [savedStacks]);
+
+  useEffect(() => {
+    localStorage.setItem('allIn_peptideHistory_v5', JSON.stringify(peptideHistory));
+  }, [peptideHistory]);
+
+  useEffect(() => {
+    localStorage.setItem('allIn_historicalLogs_v5', JSON.stringify(historicalLogs));
+  }, [historicalLogs]);
+
+  useEffect(() => {
+    localStorage.setItem('allIn_mtorState_v5', JSON.stringify(mtorState));
+  }, [mtorState]);
+
+  // Update mTOR state automatically when protein/leucine or workouts change
+  useEffect(() => {
+    const leucineGrams = Number(((dailyNutrition.aminos?.leucine || 0) / 1000).toFixed(2));
+    setMtorState((prev) => {
+      let nextMode = prev.mode;
+      if (leucineGrams >= 2.5 || dailyNutrition.protein >= 90) {
+        nextMode = 'Anabolic / mTORC1';
+      } else if (leucineGrams >= 1.0 || dailyNutrition.protein >= 30) {
+        nextMode = 'Balanced';
       } else {
-        setMorningStacks([DANS_MORNING_STACK]);
+        nextMode = 'Autophagy / AMPK';
       }
-      if (Array.isArray(cached.peptideHistory) && cached.peptideHistory.length > 0) {
-        setPeptideHistory(cached.peptideHistory);
-      }
-      if (cached.userProfile) {
-        setUserProfile((prev) => ({ ...prev, ...cached.userProfile }));
-      }
-      if (cached.hydrationGoalMl) setHydrationGoalMl(Number(cached.hydrationGoalMl) || 2500);
-      if (Array.isArray(cached.universalLogs)) setUniversalLogs(cached.universalLogs);
-    }
-    setIsLoaded(true);
-  }, []);
-
-  // Persist to LocalStorage
-  useEffect(() => {
-    if (!isLoaded) return;
-    saveStoredState({
-      todayLog,
-      morningStacks,
-      peptideHistory,
-      userProfile,
-      hydrationGoalMl,
-      universalLogs,
+      return {
+        ...prev,
+        mode: nextMode,
+        leucineTriggerGrams: leucineGrams,
+      };
     });
-  }, [
-    isLoaded,
-    todayLog,
-    morningStacks,
-    peptideHistory,
-    userProfile,
-    hydrationGoalMl,
-    universalLogs,
-  ]);
+  }, [dailyNutrition.protein, dailyNutrition.aminos?.leucine]);
 
-  // 12:01 AM Local Time Automatic Daily Reset
-  useEffect(() => {
-    const checkMidnightCycle = () => {
-      const currentCycle = getActiveCycleDateKey(new Date());
-      if (currentCycle !== activeCycleKey) {
-        setActiveCycleKey(currentCycle);
-        setTodayLog({
-          date: currentCycle,
-          meals: [],
-          stacksLogged: [],
-          workouts: [],
-          waterMl: 0,
-          steps: 0,
-          activeMinutes: 0,
-          activeCalories: 0,
-          lastModified: new Date().toISOString(),
-        });
+  // Perform persistent sync snapshot (called on launch & at 00:00:00 midnight)
+  const executePersistentSync = useCallback(
+    (reason = 'launch') => {
+      const now = new Date();
+      const timeLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const syncPayload = {
+        syncedAt: now.toISOString(),
+        reason,
+        userProfile,
+        dailyNutrition,
+        dailyHydration,
+        dailyActivity,
+        peptideHistory,
+        mtorState,
+      };
+      localStorage.setItem('allIn_cloudSyncSnapshot_v5', JSON.stringify(syncPayload));
+      setLastSyncedAt(now.toISOString());
+
+      if (reason === 'midnight') {
+        const snapshotEntry = {
+          id: `log_${Date.now()}`,
+          date: now.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+          timestamp: now.toISOString(),
+          weightLbs: userProfile.weightLbs,
+          nutrition: { ...dailyNutrition },
+          hydration: { ...dailyHydration },
+          activity: { ...dailyActivity },
+          mtorMode: mtorState.mode,
+          peptidesLogged: peptideHistory.slice(0, 5),
+        };
+        setHistoricalLogs((prev) => [snapshotEntry, ...prev]);
+        setSyncStatusBadge(`Midnight sync complete (${timeLabel}) • Scheduled 00:00`);
+      } else if (reason === 'manual') {
+        setSyncStatusBadge(`Synced ${timeLabel} • Midnight sync scheduled`);
+      } else {
+        setSyncStatusBadge('Synced on launch • Midnight sync scheduled');
       }
-    };
-    checkMidnightCycle();
-    const interval = setInterval(checkMidnightCycle, 15000);
-    return () => clearInterval(interval);
-  }, [activeCycleKey]);
+    },
+    [userProfile, dailyNutrition, dailyHydration, dailyActivity, peptideHistory, mtorState]
+  );
 
-  const addLogRecord = useCallback((entry) => {
-    const record = {
-      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      timestamp: new Date().toISOString(),
-      ...entry,
-    };
-    setUniversalLogs((prev) => [record, ...prev]);
+  // 1. Automatic Sync on App Mount + Daily Local Midnight (00:00:00) Scheduler
+  useEffect(() => {
+    // Immediate sync on mount
+    executePersistentSync('launch');
 
-    if (entry.category === 'WATER') {
-      setTodayLog((prev) => ({
-        ...prev,
-        waterMl: Math.max(0, prev.waterMl + (Number(entry.amountMl) || 0)),
-        lastModified: new Date().toISOString(),
-      }));
-    } else if (entry.category === 'NUTRITION') {
-      setTodayLog((prev) => ({
-        ...prev,
-        meals: [...prev.meals, record],
-        waterMl: prev.waterMl + (Number(entry.waterMl) || 0),
-        lastModified: new Date().toISOString(),
-      }));
-    } else if (entry.category === 'PEPTIDE') {
-      setPeptideHistory((prev) => [record, ...prev]);
-    } else if (entry.category === 'ACTIVITY') {
-      setTodayLog((prev) => ({
-        ...prev,
-        steps: prev.steps + (Number(entry.steps) || 0),
-        activeMinutes: prev.activeMinutes + (Number(entry.durationMin) || 0),
-        activeCalories: prev.activeCalories + (Number(entry.caloriesBurned) || 0),
-        lastModified: new Date().toISOString(),
-      }));
-    }
+    let midnightTimeoutId = null;
 
-    feedbackEngine.vibrate(15);
-    return record;
-  }, []);
-
-  const updateLogRecord = useCallback((id, updated) => {
-    setUniversalLogs((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updated, lastModified: new Date().toISOString() } : item))
-    );
-    setTodayLog((prev) => ({
-      ...prev,
-      meals: prev.meals.map((m) => (m.id === id ? { ...m, ...updated } : m)),
-      lastModified: new Date().toISOString(),
-    }));
-    setPeptideHistory((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...updated } : p))
-    );
-  }, []);
-
-  const deleteLogRecord = useCallback((id) => {
-    setUniversalLogs((prev) => prev.filter((item) => item.id !== id));
-    setTodayLog((prev) => ({
-      ...prev,
-      meals: prev.meals.filter((m) => m.id !== id),
-      lastModified: new Date().toISOString(),
-    }));
-    setPeptideHistory((prev) => prev.filter((p) => p.id !== id));
-  }, []);
-
-  // Direct inline override of today's summary metrics
-  const updateTodayDirectMetrics = useCallback((patch) => {
-    setTodayLog((prev) => ({
-      ...prev,
-      ...patch,
-      lastModified: new Date().toISOString(),
-    }));
-  }, []);
-
-  const todayTotals = useMemo(() => {
-    const totals = {
-      calories: 0,
-      protein: 0,
-      carbs: 0,
-      fat: 0,
-      micros: { vitaminD: 0, vitaminC: 0, magnesium: 0, zinc: 0, potassium: 0, sodium: 0 },
-      aminos: {
-        leucine: 0,
-        isoleucine: 0,
-        valine: 0,
-        lysine: 0,
-        methionine: 0,
-        phenylalanine: 0,
-        threonine: 0,
-        tryptophan: 0,
-        histidine: 0,
-      },
-      waterMl: todayLog.waterMl || 0,
-      steps: todayLog.steps || 0,
-      activeMinutes: todayLog.activeMinutes || 0,
-      activeCalories: todayLog.activeCalories || 0,
-    };
-
-    todayLog.meals.forEach((meal) => {
-      totals.calories += Number(meal.calories || 0);
-      totals.protein += Number(meal.protein || 0);
-      totals.carbs += Number(meal.carbs || 0);
-      totals.fat += Number(meal.fats || meal.fat || 0);
-      totals.aminos.leucine += Number(
-        meal.leucineMg || meal.aminos?.leucine || (meal.leucine ? meal.leucine * 1000 : 0) || 0
+    const scheduleNextMidnightSync = () => {
+      const now = new Date();
+      const nextMidnight = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+        0,
+        0,
+        0,
+        0
       );
+      const msUntilMidnight = Math.max(1000, nextMidnight.getTime() - now.getTime());
 
-      ESSENTIAL_AMINO_ACIDS.forEach(({ key }) => {
-        if (key !== 'leucine') {
-          totals.aminos[key] += Number(
-            meal.aminos?.[key] || (meal[key] ? meal[key] * 1000 : 0) || 0
-          );
-        }
-      });
+      midnightTimeoutId = setTimeout(() => {
+        executePersistentSync('midnight');
+        scheduleNextMidnightSync(); // Reschedule daily for the following midnight
+      }, msUntilMidnight);
+    };
 
-      MICRONUTRIENT_FIELDS.forEach(({ key }) => {
-        totals.micros[key] += Number(meal.micros?.[key] || 0);
-      });
-    });
+    scheduleNextMidnightSync();
 
-    totals.calories = Math.round(totals.calories);
-    totals.protein = Math.round(totals.protein * 10) / 10;
-    totals.carbs = Math.round(totals.carbs * 10) / 10;
-    totals.fat = Math.round(totals.fat * 10) / 10;
-
-    return totals;
-  }, [todayLog]);
-
-  const incrementWater = useCallback(
-    (amountMl = 250) => {
-      addLogRecord({
-        category: 'WATER',
-        title: `Hydration (+${amountMl} ml)`,
-        amountMl,
-        summary: `${amountMl} ml water intake`,
-      });
-    },
-    [addLogRecord]
-  );
-
-  const logMorningStack = useCallback(
-    (stack) => {
-      if (!stack) return;
-      addLogRecord({
-        category: 'NUTRITION',
-        title: stack.name,
-        calories: stack.totals?.calories || 0,
-        protein: stack.totals?.protein || 0,
-        carbs: stack.totals?.carbs || 0,
-        fats: stack.totals?.fats || 0,
-        waterMl: stack.totals?.waterMl || 0,
-        leucineMg: stack.totals?.aminos?.leucine || 0,
-        aminos: stack.totals?.aminos || {},
-        micros: stack.totals?.micros || {},
-        summary: `${stack.totals?.calories || 0} kcal • ${stack.totals?.protein || 0}g P • +${
-          stack.totals?.waterMl || 0
-        }ml H2O • Leu: ${stack.totals?.aminos?.leucine || 0}mg`,
-      });
-      feedbackEngine.playChime('stack');
-    },
-    [addLogRecord]
-  );
-
-  const updateUserProfile = useCallback((newProfile) => {
-    setUserProfile((prev) => ({ ...prev, ...newProfile }));
+    return () => {
+      if (midnightTimeoutId) clearTimeout(midnightTimeoutId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const saveOrUpdateStack = useCallback((stackObj) => {
-    setMorningStacks((prev) => {
-      const exists = prev.some((s) => s.id === stackObj.id);
-      if (exists) {
-        return prev.map((s) => (s.id === stackObj.id ? stackObj : s));
-      }
-      return [stackObj, ...prev];
-    });
-  }, []);
+  // Log a stack or food item into daily nutrition + hydration
+  const logStackToDaily = (stackTotals, itemName = null) => {
+    const addedCarbs = Number(stackTotals.carbs) || 0;
+    const addedFiber = Number(stackTotals.fiber ?? stackTotals.fibre) || 0;
+    const addedNetCarbs =
+      stackTotals.netCarbs !== undefined
+        ? Number(stackTotals.netCarbs)
+        : Math.max(0, Math.round((addedCarbs - addedFiber) * 10) / 10);
 
-  const value = {
-    userProfile,
-    updateUserProfile,
-    hydrationGoalMl,
-    setHydrationGoalMl,
-    morningStacks,
-    setMorningStacks,
-    saveOrUpdateStack,
-    peptideHistory,
-    setPeptideHistory,
-    universalLogs,
-    addLogRecord,
-    updateLogRecord,
-    deleteLogRecord,
-    todayLog,
-    todayTotals,
-    updateTodayDirectMetrics,
-    incrementWater,
-    logMorningStack,
-    activeCycleKey,
+    setDailyNutrition((prev) => {
+      const nextCarbs = Math.round((prev.carbs + addedCarbs) * 10) / 10;
+      const nextFiber = Math.round(((prev.fiber || 0) + addedFiber) * 10) / 10;
+      const nextNetCarbs = Math.max(0, Math.round((nextCarbs - nextFiber) * 10) / 10);
+
+      const newMeal = itemName
+        ? [
+            {
+              id: `meal_${Date.now()}`,
+              name: itemName,
+              calories: Math.round(Number(stackTotals.calories) || 0),
+              protein: Math.round((Number(stackTotals.protein) || 0) * 10) / 10,
+              carbs: addedCarbs,
+              fiber: addedFiber,
+              netCarbs: addedNetCarbs,
+              fats: Math.round((Number(stackTotals.fats ?? stackTotals.fat) || 0) * 10) / 10,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+            ...(prev.meals || []),
+          ]
+        : prev.meals || [];
+
+      return {
+        ...prev,
+        calories: Math.round(prev.calories + (Number(stackTotals.calories) || 0)),
+        protein: Math.round((prev.protein + (Number(stackTotals.protein) || 0)) * 10) / 10,
+        carbs: nextCarbs,
+        fiber: nextFiber,
+        netCarbs: nextNetCarbs,
+        fats: Math.round((prev.fats + (Number(stackTotals.fats ?? stackTotals.fat) || 0)) * 10) / 10,
+        meals: newMeal,
+        micros: {
+          vitaminD: Math.round(((prev.micros?.vitaminD || 0) + (Number(stackTotals.micros?.vitaminD) || 0)) * 10) / 10,
+          vitaminC: Math.round((prev.micros?.vitaminC || 0) + (Number(stackTotals.micros?.vitaminC) || 0)),
+          magnesium: Math.round((prev.micros?.magnesium || 0) + (Number(stackTotals.micros?.magnesium) || 0)),
+          zinc: Math.round(((prev.micros?.zinc || 0) + (Number(stackTotals.micros?.zinc) || 0)) * 10) / 10,
+          potassium: Math.round((prev.micros?.potassium || 0) + (Number(stackTotals.micros?.potassium) || 0)),
+          sodium: Math.round((prev.micros?.sodium || 0) + (Number(stackTotals.micros?.sodium) || 0)),
+        },
+        aminos: {
+          leucine: Math.round((prev.aminos?.leucine || 0) + (Number(stackTotals.aminos?.leucine) || 0)),
+          isoleucine: Math.round((prev.aminos?.isoleucine || 0) + (Number(stackTotals.aminos?.isoleucine) || 0)),
+          valine: Math.round((prev.aminos?.valine || 0) + (Number(stackTotals.aminos?.valine) || 0)),
+          lysine: Math.round((prev.aminos?.lysine || 0) + (Number(stackTotals.aminos?.lysine) || 0)),
+          methionine: Math.round((prev.aminos?.methionine || 0) + (Number(stackTotals.aminos?.methionine) || 0)),
+          phenylalanine: Math.round((prev.aminos?.phenylalanine || 0) + (Number(stackTotals.aminos?.phenylalanine) || 0)),
+          threonine: Math.round((prev.aminos?.threonine || 0) + (Number(stackTotals.aminos?.threonine) || 0)),
+          tryptophan: Math.round((prev.aminos?.tryptophan || 0) + (Number(stackTotals.aminos?.tryptophan) || 0)),
+          histidine: Math.round((prev.aminos?.histidine || 0) + (Number(stackTotals.aminos?.histidine) || 0)),
+        },
+      };
+    });
+
+    if (stackTotals.waterMl) {
+      setDailyHydration((prev) => ({
+        ...prev,
+        currentMl: prev.currentMl + Number(stackTotals.waterMl),
+      }));
+    }
   };
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
-}
+  // Peptide CRUD handlers
+  const addPeptideEntry = (entry) => {
+    setPeptideHistory((prev) => [entry, ...prev]);
+  };
 
-export function useApp() {
-  const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
-  return context;
-}
+  const updatePeptideEntry = (id, updatedFields) => {
+    setPeptideHistory((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...updatedFields } : item))
+    );
+  };
+
+  const deletePeptideEntry = (id) => {
+    setPeptideHistory((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  // Athletic Training Session Logger
+  const addTrainingSession = ({ type, summary, calories, durationMinutes = 0 }) => {
+    const kcal = Math.max(1, Math.round(Number(calories) || 0));
+    const mins = Math.max(0, Math.round(Number(durationMinutes) || 0));
+    const newSession = {
+      id: `train_${Date.now()}`,
+      type,
+      summary,
+      calories: kcal,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setDailyActivity((prev) => ({
+      ...prev,
+      caloriesBurned: (Number(prev.caloriesBurned) || 0) + kcal,
+      activeMinutes: (Number(prev.activeMinutes) || 0) + mins,
+      trainingLogs: [newSession, ...(prev.trainingLogs || [])],
+    }));
+  };
+
+  const deleteTrainingSession = (id) => {
+    setDailyActivity((prev) => {
+      const target = (prev.trainingLogs || []).find((t) => t.id === id);
+      const deduct = target ? Number(target.calories) || 0 : 0;
+      return {
+        ...prev,
+        caloriesBurned: Math.max(0, (Number(prev.caloriesBurned) || 0) - deduct),
+        trainingLogs: (prev.trainingLogs || []).filter((t) => t.id !== id),
+      };
+    });
+  };
+
+  // Archive today's log manually & reset
+  const archiveDailyLog = () => {
+    const snapshot = {
+      id: `log_${Date.now()}`,
+      date: new Date().toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      timestamp: new Date().toISOString(),
+      weightLbs: userProfile.weightLbs,
+      nutrition: { ...dailyNutrition },
+      hydration: { ...dailyHydration },
+      activity: { ...dailyActivity },
+      mtorMode: mtorState.mode,
+      peptidesLogged: peptideHistory.slice(0, 5),
+    };
+    setHistoricalLogs((prev) => [snapshot, ...prev]);
+    setDailyNutrition(INITIAL_NUTRITION);
+    setDailyHydration(INITIAL_HYDRATION);
+    setDailyActivity(INITIAL_ACTIVITY);
+    executePersistentSync('manual');
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        userProfile,
+        setUserProfile,
+        dailyNutrition,
+        setDailyNutrition,
+        dailyHydration,
+        setDailyHydration,
+        dailyActivity,
+        setDailyActivity,
+        savedStacks,
+        setSavedStacks,
+        peptideHistory,
+        setPeptideHistory,
+        addPeptideEntry,
+        updatePeptideEntry,
+        deletePeptideEntry,
+        addTrainingSession,
+        deleteTrainingSession,
+        historicalLogs,
+        setHistoricalLogs,
+        mtorState,
+        setMtorState,
+        logStackToDaily,
+        archiveDailyLog,
+        isScannerOpen,
+        setIsScannerOpen,
+        syncStatusBadge,
+        lastSyncedAt,
+        executePersistentSync,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useAppContext = () => useContext(AppContext);
+export const useApp = () => useContext(AppContext);
