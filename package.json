@@ -1,0 +1,7 @@
+{
+  "name": "all-in",
+  "version": "4.0.0",
+  "private": true,
+  "description": "All In health suite",
+  "scripts": { "dev": "vercel dev", "deploy": "vercel --prod" }
+}
