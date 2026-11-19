@@ -609,9 +609,8 @@ const TrainingScheduleCalendarChart = () => {
               type="button"
               onClick={() => toggleCalendarDateStatus(d.key)}
               title={`${d.key} (${badgeText}) — Tap to toggle Scheduled / Completed`}
-              className={`rounded-xl p-1 border transition flex flex-col items-center justify-center ${cellClasses} ${
-                d.isToday ? 'ring-2 ring-cyan-300' : ''
-              }`}
+              className={`rounded-xl p-1 border transition flex flex-col items-center justify-center ${cellClasses} ${d.isToday ? 'ring-2 ring-cyan-300' : ''
+                }`}
             >
               <span className="text-[8px] uppercase opacity-80 leading-none">
                 {d.dayLabel}
@@ -1007,7 +1006,7 @@ const AthleticTrainingModal = ({ onClose }) => {
     addTrainingSession(sessionPayload);
     setCoachBannerMsg(
       customCoachMsg ||
-        `Coach: Strong work, Dan! ${sessionPayload.type} locked into recovery telemetry.`
+      `Coach: Strong work, Dan! ${sessionPayload.type} locked into recovery telemetry.`
     );
     setTimeout(() => setCoachBannerMsg(''), 3500);
   };
@@ -1131,11 +1130,10 @@ const AthleticTrainingModal = ({ onClose }) => {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveSubTab(tab.id)}
-                className={`py-1.5 rounded-xl text-[10px] font-black transition truncate ${
-                  activeSubTab === tab.id
+                className={`py-1.5 rounded-xl text-[10px] font-black transition truncate ${activeSubTab === tab.id
                     ? 'bg-indigo-400 text-slate-950 shadow-xs'
                     : 'text-slate-200 hover:text-white'
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -1347,15 +1345,14 @@ const AthleticTrainingModal = ({ onClose }) => {
                     return (
                       <div
                         key={z.zone}
-                        className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[11px] border transition ${
-                          z.isFatBurn
+                        className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[11px] border transition ${z.isFatBurn
                             ? isCurrent
                               ? 'bg-emerald-500 text-slate-950 border-emerald-300 font-black shadow-xs'
                               : 'bg-emerald-950/60 text-emerald-200 border-emerald-500/40 font-extrabold'
                             : isCurrent
-                            ? 'bg-indigo-500 text-slate-950 border-indigo-300 font-black'
-                            : 'bg-slate-950/75 text-slate-200 border-white/10 font-semibold'
-                        }`}
+                              ? 'bg-indigo-500 text-slate-950 border-indigo-300 font-black'
+                              : 'bg-slate-950/75 text-slate-200 border-white/10 font-semibold'
+                          }`}
                       >
                         <div className="flex items-center gap-1.5">
                           <span>{z.zone}</span>

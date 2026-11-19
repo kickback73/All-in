@@ -220,7 +220,7 @@ export default function UserProfileModal({ isOpen, onClose }) {
 
     try {
       if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(combinedDispatchPayload).catch(() => {});
+        navigator.clipboard.writeText(combinedDispatchPayload).catch(() => { });
       }
     } catch {
       // Ignore clipboard permission errors
@@ -298,11 +298,10 @@ export default function UserProfileModal({ isOpen, onClose }) {
               key={t.id}
               type="button"
               onClick={() => setActiveTab(t.id)}
-              className={`py-1.5 rounded-xl text-[10px] font-black transition truncate ${
-                activeTab === t.id
+              className={`py-1.5 rounded-xl text-[10px] font-black transition truncate ${activeTab === t.id
                   ? 'bg-cyan-400 text-slate-950 shadow-xs'
                   : 'text-slate-200 hover:text-white'
-              }`}
+                }`}
             >
               {t.label}
             </button>
