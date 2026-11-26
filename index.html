@@ -926,7 +926,7 @@
     }
 
     .card.fp {
-      background-image: linear-gradient(0deg, var(--s1) 22%, color-mix(in srgb, var(--s1) 86%, transparent)), var(--im);
+      background-image: linear-gradient(0deg, color-mix(in srgb, var(--s1) 52%, transparent) 0%, color-mix(in srgb, var(--s1) 22%, transparent) 100%), var(--im);
       background-position: center 20%
     }
 
@@ -954,12 +954,300 @@
     .nd b {
       color: var(--tx)
     }
+
+    /* ===== Desktop Command Center (>= 960px) ===== */
+    .dtick,
+    .dside,
+    .d-only {
+      display: none
+    }
+
+    @media(min-width:960px) {
+      header,
+      nav {
+        display: none !important
+      }
+
+      body {
+        padding-top: 38px
+      }
+
+      .dtick {
+        display: flex;
+        align-items: center;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 38px;
+        background: #05080f;
+        border-bottom: 1px solid var(--ln);
+        z-index: 25;
+        overflow: hidden;
+        font-size: 12px;
+        font-weight: 600
+      }
+
+      .dtick-lbl {
+        flex: none;
+        background: #ff6a00;
+        color: #06080d;
+        font: 800 italic 13px/1 'Barlow Condensed';
+        letter-spacing: .6px;
+        padding: 0 12px;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        z-index: 2
+      }
+
+      .dtick-track {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        white-space: nowrap;
+        padding-left: 20px;
+        animation: tickerScroll 48s linear infinite
+      }
+
+      .dtick:hover .dtick-track {
+        animation-play-state: paused
+      }
+
+      @keyframes tickerScroll {
+        0% { transform: translateX(0) }
+        100% { transform: translateX(-50%) }
+      }
+
+      .tk-q {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--tx)
+      }
+
+      .tk-up { color: #19e0b0 }
+      .tk-dn { color: #ff4d5e }
+
+      .tk-news {
+        color: var(--mu);
+        text-decoration: none;
+        transition: color .2s
+      }
+
+      .tk-news:hover {
+        color: var(--tx)
+      }
+
+      .dside {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        top: 38px;
+        left: 0;
+        bottom: 0;
+        width: 240px;
+        background: var(--s1);
+        border-right: 1px solid var(--ln);
+        padding: 18px 14px;
+        z-index: 15;
+        overflow-y: auto
+      }
+
+      .dside-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin: 16px 0
+      }
+
+      .dside-nav a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        color: var(--mu);
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 14px;
+        transition: background .15s, color .15s
+      }
+
+      .dside-nav a:hover {
+        background: var(--s2);
+        color: var(--tx)
+      }
+
+      .dside-nav a.on {
+        background: color-mix(in srgb, var(--a) 16%, transparent);
+        color: var(--tx);
+        border-left: 3px solid var(--a)
+      }
+
+      .dside-nav a svg {
+        width: 19px;
+        height: 19px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex: none
+      }
+
+      .dside-nav a.on svg {
+        stroke: var(--a)
+      }
+
+      .dside-nav a[href="#train"] {
+        animation: trainGlow 20s ease-in-out infinite
+      }
+
+      main {
+        margin-left: 240px;
+        max-width: 1440px;
+        padding: 18px 26px 48px
+      }
+
+      .d-only {
+        display: block
+      }
+
+      .d-bento {
+        display: grid;
+        grid-template-columns: minmax(360px, 460px) 1fr;
+        gap: 18px;
+        align-items: start
+      }
+
+      .d-two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        align-items: start
+      }
+
+      .gal-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 14px
+      }
+
+      .gal-card {
+        position: relative;
+        height: 124px;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid var(--ln);
+        cursor: pointer
+      }
+
+      .gal-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        transition: transform .35s ease
+      }
+
+      .gal-card:hover img {
+        transform: scale(1.06)
+      }
+
+      .gal-cap {
+        position: absolute;
+        inset: auto 0 0 0;
+        padding: 20px 10px 8px;
+        background: linear-gradient(0deg, rgba(6, 8, 13, .88) 0%, transparent 100%);
+        font: 800 italic 15px/1 'Barlow Condensed';
+        letter-spacing: .4px;
+        color: #fff
+      }
+
+      .stk-row {
+        display: grid;
+        grid-template-columns: 1.1fr .8fr .9fr 1fr 1fr auto;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 0;
+        border-top: 1px solid var(--ln);
+        font-size: 13px
+      }
+
+      .stk-hd {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        color: var(--mu);
+        font-weight: 700;
+        border-top: 0;
+        padding-top: 2px
+      }
+
+      .art-list {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        max-height: 400px;
+        overflow-y: auto;
+        padding-right: 4px
+      }
+
+      .art-card {
+        display: block;
+        text-decoration: none;
+        background: var(--s2);
+        border: 1px solid var(--ln);
+        border-radius: 10px;
+        padding: 10px 12px;
+        transition: border-color .2s
+      }
+
+      .art-card:hover {
+        border-color: var(--a)
+      }
+
+      .art-card b {
+        display: block;
+        color: var(--tx);
+        font-size: 13.5px;
+        line-height: 1.3;
+        margin: 4px 0
+      }
+
+      .tip-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-top: 12px
+      }
+
+      .tip-card {
+        background: var(--s2);
+        border: 1px solid var(--ln);
+        border-left: 3px solid var(--a);
+        border-radius: 8px;
+        padding: 10px 12px
+      }
+
+      .tip-card b {
+        display: block;
+        font-size: 13px;
+        color: var(--tx);
+        margin-bottom: 4px
+      }
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 
 <body data-tab="today">
+  <div id="dtick" class="dtick"></div>
+  <aside id="dside" class="dside"></aside>
   <header>
     <div class="logo">ALL<span>IN</span></div>
     <div id="hb" class="hb"></div><button class="chip" onclick="sheet()" id="hn"></button>
@@ -1111,7 +1399,7 @@
     const nowT = () => LTS || Date.now(), CATS = ['Morning', 'Afternoon', 'Evening', 'Recipes'];
     const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const age = () => { const b = new Date(S.pr.dob), n = new Date(); let a = n.getFullYear() - b.getFullYear(); if (n < new Date(n.getFullYear(), b.getMonth(), b.getDate())) a--; return a };
-    const kg = () => S.wt / 2.2046, newB = () => ({ n: '', cat: SC || 'Morning', t: '07:30', sv: 1, fav: false, items: [{ d: '', k: 0, p: 0, c: 0, f: 0, fi: 0, sg: 0, w: 0 }] }); let B = newB();
+    const kg = () => S.wt / 2.2046, newB = () => ({ n: '', cat: SC || 'Morning', t: '07:30', sv: 1, fav: false, items: [{ d: '', amt: '', k: 0, p: 0, c: 0, f: 0, fi: 0, sg: 0, w: 0 }] }); let B = newB();
     const MI = [['A', 'Vitamin A', 'mcg', 900], ['C', 'Vitamin C', 'mg', 90], ['D', 'Vitamin D', 'mcg', 15], ['E', 'Vitamin E', 'mg', 15], ['K', 'Vitamin K', 'mcg', 120], ['B1', 'B1', 'mg', 1.2], ['B2', 'B2', 'mg', 1.3], ['B3', 'B3', 'mg', 16], ['B6', 'B6', 'mg', 1.7], ['B12', 'B12', 'mcg', 2.4], ['Fol', 'Folate', 'mcg', 400], ['Ca', 'Calcium', 'mg', 1000], ['Fe', 'Iron', 'mg', 8], ['Mg', 'Magnesium', 'mg', 420], ['Ka', 'Potassium', 'mg', 3400], ['Zn', 'Zinc', 'mg', 11], ['Se', 'Selenium', 'mcg', 55], ['Na', 'Sodium', 'mg', 2300]];
     const AM = [['his', 'Histidine', 10], ['ile', 'Isoleucine', 20], ['leu', 'Leucine', 39], ['lys', 'Lysine', 30], ['met', 'Met+Cys', 15], ['phe', 'Phe+Tyr', 25], ['thr', 'Threonine', 15], ['trp', 'Tryptophan', 4], ['val', 'Valine', 26]];
     const X = [
@@ -1205,9 +1493,9 @@ ${B.items.map((x, i) => `<div class="it"><div class="row f"><input placeholder="
 <button class="btn ghost" onclick="B.items.push({d:'',k:0,p:0,c:0,f:0,fi:0,w:0});go('stacks')">+ Add ingredient</button><div id="bt" class="mu" style="margin:10px 0">${btxt()}</div><button class="btn" onclick="saveB()">Save stack</button></div>`
     };
     const btxt = () => { const t = T2(B.items); return `Total: ${Math.round(t.k)} kcal · ${r1(t.p)}P ${r1(t.c)}C ${r1(t.f)}F${t.sg ? ` · ${r1(t.sg)}g sugar` : ''}${t.w ? ` · ${t.w}ml` : ''}` }, bt = () => { const e = $('#bt'); if (e) e.textContent = btxt() };
-    function rmI(i) { B.items.splice(i, 1); if (!B.items.length) B.items.push({ d: '', k: 0, p: 0, c: 0, f: 0, fi: 0, sg: 0, w: 0 }); go('fuel') }
-    async function iEst(i) { const x = B.items[i]; if (!x.d.trim()) return toast('Describe the ingredient'); $('#ie' + i).textContent = '…'; try { const r = await aiFood(x.d); Object.assign(x, { k: r1(+r.k || 0), p: r1(+r.p || 0), c: r1(+r.c || 0), f: r1(+r.f || 0), fi: r1(+r.fi || 0), sg: r1(+r.sg || 0), w: +r.w || 0, mi: r.mi || {}, am: r.am || {} }); toast('Auto-filled. Edit any number.') } catch (e) { toast('Auto-fill unavailable. Enter numbers.') } go('fuel') }
-    function saveB() { const items = B.items.filter(x => x.d.trim()); if (!B.n.trim() || !items.length) return toast('Add a name and an ingredient'); items.forEach(x => { if (x.u) S.upc[x.u] = { ...x, n: x.d } }); const tt = T2(items), o = { ...B, id: B.id || uid(), fav: !!B.fav, items, k: Math.round(tt.k), p: r1(tt.p), sg: r1(tt.sg), w: tt.w }; S.stacks = S.stacks.filter(x => x.id != o.id).concat(o); SC = o.cat; B = newB(); STACK_BUILD_OPEN = false; save(); toast(o.fav ? 'Stack saved & favourited ★' : 'Stack saved'); go('fuel') }
+    function rmI(i) { B.items.splice(i, 1); if (!B.items.length) B.items.push({ d: '', amt: '', k: 0, p: 0, c: 0, f: 0, fi: 0, sg: 0, w: 0 }); go('fuel') }
+    async function iEst(i) { const x = B.items[i]; if (!x.d.trim()) return toast('Describe the ingredient'); $('#ie' + i).textContent = '…'; try { const q = [x.amt, x.d].filter(Boolean).join(' ').trim(); const r = await aiFood(q); Object.assign(x, { k: r1(+r.k || 0), p: r1(+r.p || 0), c: r1(+r.c || 0), f: r1(+r.f || 0), fi: r1(+r.fi || 0), sg: r1(+r.sg || 0), w: +r.w || 0, mi: r.mi || {}, am: r.am || {} }); toast('Auto-filled. Edit any number.') } catch (e) { toast('Auto-fill unavailable. Enter numbers.') } go('fuel') }
+    function saveB() { const items = B.items.filter(x => x.d.trim()).map(x => { const c = { ...x }; delete c._base; return c }); if (!B.n.trim() || !items.length) return toast('Add a name and an ingredient'); items.forEach(x => { if (x.u) S.upc[x.u] = { ...x, n: x.d } }); const tt = T2(items), o = { ...B, id: B.id || uid(), fav: !!B.fav, items, k: Math.round(tt.k), p: r1(tt.p), sg: r1(tt.sg), w: tt.w }; S.stacks = S.stacks.filter(x => x.id != o.id).concat(o); SC = o.cat; B = newB(); STACK_BUILD_OPEN = false; save(); toast(o.fav ? 'Stack saved & favourited ★' : 'Stack saved'); go('fuel') }
     function editS(id) { B = JSON.parse(JSON.stringify(S.stacks.find(x => x.id == id))); SC = B.cat; STACK_BUILD_OPEN = true; go('fuel'); setTimeout(() => { const el = $('#sbuild'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); else scrollTo(0, document.body.scrollHeight) }, 60) }
     const est2 = () => { const e = X[D2.i] || X[0], isC = e[1] == 'Cardio' || e[3] == 'min', s = isC ? 1 : D2.sets, m = e[3] == 'rep' ? s * D2.reps * 4 / 60 : e[3] == 'time' ? s * D2.reps / 60 : s * D2.reps; return Math.round(e[4] * kg() * m / 60 * D2.rpe / 7) };
     const UN = { rep: 'reps', time: 'sec', min: 'min' };
@@ -1704,14 +1992,17 @@ function doPost(e) {
         u = S.upc[c] || null;
       }
       stopScan();
+      const stripAmt = s => String(s || '').replace(/\s*\([^)]*(?:\d|g|ml|oz|lb|kg|tbsp|tsp|cup|packet|scoop|srv|serving)[^)]*\)\s*$/i, '').trim();
       if (SCX === 'f') {
         go('fuel');
         setTimeout(() => {
           if (u) {
             FAUTO = false;
             SCAN_BASE = u;
-            fillF(u, false);
-            toast(`Found ${u.n || u.d} (${Math.round(u.k)} kcal · ${r1(u.p)}g P)`, 3200);
+            const cleanName = stripAmt(u.n || u.d || '');
+            fillF({ ...u, n: cleanName }, false);
+            const fa = $('#fa'); if (fa) { fa.value = ''; fa.focus(); }
+            toast(`Found ${cleanName} — enter amount if needed`, 3200);
           } else {
             PEND = c;
             toast('New barcode. Name it and tap Auto-fill once. Next scan is instant.', 4000);
@@ -1719,12 +2010,14 @@ function doPost(e) {
           }
         }, 90);
       } else {
-        const it = u ? { ...u, u: c, d: u.d || u.n, m: 1 } : { d: '', k: 0, p: 0, c: 0, f: 0, fi: 0, sg: 0, w: 0, u: c };
+        const cleanName = u ? stripAmt(u.d || u.n || '') : '';
+        const it = u ? { ...u, u: c, d: cleanName, amt: '', _base: u, m: 1 } : { d: '', amt: '', k: 0, p: 0, c: 0, f: 0, fi: 0, sg: 0, w: 0, u: c };
         if (typeof SCX === 'number' && B.items[SCX]) B.items[SCX] = it;
         else if (B.items.length == 1 && !B.items[0].d) B.items[0] = it;
         else B.items.push(it);
+        STACK_BUILD_OPEN = true;
         go('fuel');
-        toast(u ? 'Added ' + it.d : `New barcode (${c}). Describe it, then Auto-fill.`, 3500);
+        toast(u ? `Added ${cleanName} — enter amount` : `New barcode (${c}). Describe it, then Auto-fill.`, 3500);
       }
     }
 
@@ -1756,6 +2049,33 @@ function doPost(e) {
       }
       FAUTO = true; dbn('f', fEst);
     }
+    function onStackAmt(i, amtStr) {
+      const x = B.items[i]; if (!x) return;
+      x.amt = amtStr;
+      const amt = String(amtStr || '').trim();
+      if (x._base && amt) {
+        let factor = 1;
+        if (/^\d+(?:\.\d+)?$/.test(amt)) factor = parseFloat(amt) || 1;
+        else if (x._base.servingGrams) factor = parsePortion(amt, { defG: x._base.servingGrams }) / x._base.servingGrams;
+        if (factor > 0 && isFinite(factor)) {
+          Object.assign(x, {
+            k: r1((+x._base.k || 0) * factor),
+            p: r1((+x._base.p || 0) * factor),
+            c: r1((+x._base.c || 0) * factor),
+            f: r1((+x._base.f || 0) * factor),
+            fi: r1((+x._base.fi || 0) * factor),
+            sg: r1((+x._base.sg || 0) * factor),
+            w: Math.round((+x._base.w || 0) * factor),
+            mi: mul(x._base.mi || {}, factor),
+            am: mul(x._base.am || {}, factor)
+          });
+          ['k', 'p', 'c', 'f', 'sg'].forEach(k => { const el = $('#b' + i + k); if (el) el.value = x[k] || '' });
+          bt();
+          return;
+        }
+      }
+      x.m = 0; dbn('i' + i, () => iAuto(i));
+    }
     async function fEst(manual) { const n = val('fn').trim(), amt = val('fa').trim(); if (n.length < 2) { if (manual) toast('Type a food first'); return } if (manual === 1) FAUTO = true; if (!FAUTO) return; const q = amt ? `${amt} ${n}` : n; const b = $('#lb'); if (b) b.textContent = 'Estimating…'; try { const r = await aiFood(q); if (val('fn').trim() === n && val('fa').trim() === amt && FAUTO) { fillF(r, true); if (manual === 1) toast('Auto-filled verified nutrition') } } catch (e) { if (manual === 1) toast('Auto-fill unavailable. Enter numbers.') } const b2 = $('#lb'); if (b2) b2.textContent = 'Auto-fill nutrition' }
     async function addFood() { const n = val('fn').trim(), amt = val('fa').trim(), fullName = n ? (amt && !n.toLowerCase().includes(amt.toLowerCase()) ? `${n} (${amt})` : n) : (amt ? `Quick add (${amt})` : 'Quick add'), makeFav = $('#favchk') && $('#favchk').checked, e = { id: uid(), ts: EDTS || nowT(), n: fullName, k: num('fk'), p: num('fp'), c: num('fc'), f: num('ff'), fi: num('fi'), sg: num('fs'), w: ESTF.w || 0, mi: ESTF.mi || {}, am: ESTF.am || {} }; if (!n && !e.k && !e.p && !e.c && !e.f && !e.sg) return toast('Add a name or numbers'); if (n && !Object.keys(e.mi).length) { toast('Looking up nutrition…', 3000); try { const r = await aiFood(amt ? `${amt} ${n}` : n); e.mi = r.mi || {}; e.am = r.am || {}; if (!e.k && !e.p && !e.c && !e.f) Object.assign(e, { k: r1(+r.k || 0), p: r1(+r.p || 0), c: r1(+r.c || 0), f: r1(+r.f || 0), fi: r1(+r.fi || 0), sg: e.sg || r1(+r.sg || 0), w: e.w || +r.w || 0 }) } catch (x) { } } S.food.push(e); if (makeFav && n) { S.favs = S.favs || []; const idx = S.favs.findIndex(f => (f.n || '').toLowerCase().trim() === e.n.toLowerCase().trim()), favObj = { id: uid(), n: e.n, k: e.k, p: e.p, c: e.c, f: e.f, fi: e.fi, sg: e.sg, w: e.w, mi: e.mi, am: e.am }; if (idx >= 0) S.favs[idx] = favObj; else S.favs.push(favObj) } if (PEND) { S.upc[PEND] = { ...e }; PEND = null } EDTS = null; ESTF = {}; SCAN_BASE = null; save(); toast(makeFav ? 'Logged & saved to favourites ★' : 'Logged'); go('fuel') }
     const fld2 = (id, l) => `<div><label>${l}</label><input id="${id}" type="number" inputmode="decimal" placeholder="0" oninput="FAUTO=false"></div>`;
@@ -1769,40 +2089,36 @@ function doPost(e) {
       return `<div class="card fp i1" style="--c:#ffa51f">
         <h2>Saved stacks <small>${S.stacks.length}</small></h2>
         <div class="pills" style="margin-bottom:10px">${cats.map(c => `<button class="pill ${c == SC ? 'on' : ''}" onclick="SC='${c}';${c !== 'All' ? `B.cat='${c}';` : ''}go('${dest}')">${c} (${c === 'All' ? S.stacks.length : S.stacks.filter(x => x.cat == c).length})</button>`).join('')}</div>
-        ${L.length ? L.map(x => { const t = T2(x.items), f = x.cat == 'Recipes' ? 1 / (x.sv || 1) : 1, d = S.food.some(e => isT(e) && e.n.startsWith(x.n)); return `<div class="li" style="display:block"><div class="row"><div style="flex:1;min-width:0"><b>${esc(x.n)}</b><span class="mu">${f < 1 ? 'Per serving · ' : x.t + ' · '}${Math.round(t.k * f)} kcal · ${r1(t.p * f)}P ${r1(t.c * f)}C ${r1(t.f * f)}F${t.sg ? ` · ${r1(t.sg * f)}g sug` : ''}</span></div><button class="add" onclick="logStack('${x.id}')">${d ? 'Again' : 'Log'}</button><button class="x" style="color:${x.fav ? '#ffa51f' : 'var(--mu)'};font-size:16px" title="${x.fav ? 'In favourites' : 'Save stack to favourites'}" onclick="toggleStackFav('${x.id}')">★</button><button class="x" onclick="editS('${x.id}')">✎</button><button class="x" onclick="del('stacks','${x.id}')">✕</button></div><details><summary class="mu">${x.items.length} ingredient${x.items.length > 1 ? 's' : ''}${f < 1 ? ' · ' + x.sv + ' servings' : ''}</summary>${x.items.map(i => `<div class="mu" style="padding:3px 0"><b style="display:inline;color:var(--tx)">${esc(i.d)}</b>: ${Math.round(i.k)} kcal · ${r1(i.p)}P ${r1(i.c)}C ${r1(i.f)}F${i.sg ? ` · ${r1(i.sg)}g sug` : ''}${i.w ? ` · ${i.w}ml` : ''}</div>`).join('')}</details></div>` }).join('') : `<div class="mu">Nothing here yet. Build one below.</div>`}
+        ${L.length ? L.map(x => { const t = T2(x.items), f = x.cat == 'Recipes' ? 1 / (x.sv || 1) : 1, d = S.food.some(e => isT(e) && e.n.startsWith(x.n)); return `<div class="li" style="display:block"><div class="row"><div style="flex:1;min-width:0"><b>${esc(x.n)}</b><span class="mu">${f < 1 ? 'Per serving · ' : x.t + ' · '}${Math.round(t.k * f)} kcal · ${r1(t.p * f)}P ${r1(t.c * f)}C ${r1(t.f * f)}F${t.sg ? ` · ${r1(t.sg * f)}g sug` : ''}</span></div><button class="add" onclick="logStack('${x.id}')">${d ? 'Again' : 'Log'}</button><button class="x" style="color:${x.fav ? '#ffa51f' : 'var(--mu)'};font-size:16px" title="${x.fav ? 'In favourites' : 'Save stack to favourites'}" onclick="toggleStackFav('${x.id}')">★</button><button class="x" onclick="editS('${x.id}')">✎</button><button class="x" onclick="del('stacks','${x.id}')">✕</button></div><details><summary class="mu">${x.items.length} ingredient${x.items.length > 1 ? 's' : ''}${f < 1 ? ' · ' + x.sv + ' servings' : ''}</summary>${x.items.map(i => `<div class="mu" style="padding:3px 0"><b style="display:inline;color:var(--tx)">${esc(i.d)}${i.amt ? ` (${esc(i.amt)})` : ''}</b>: ${Math.round(i.k)} kcal · ${r1(i.p)}P ${r1(i.c)}C ${r1(i.f)}F${i.sg ? ` · ${r1(i.sg)}g sug` : ''}${i.w ? ` · ${i.w}ml` : ''}</div>`).join('')}</details></div>` }).join('') : `<div class="mu">Nothing here yet. Build one below.</div>`}
         ${inFuel && !showBuilder ? `<button class="btn ghost" style="margin-top:10px" onclick="STACK_BUILD_OPEN=true;go('fuel')">+ Build new stack</button>` : ''}
       </div>
-      ${showBuilder ? `<div id="sbuild" class="card" style="--c:#ffa51f"><div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><h2 style="margin:0">${B.id ? 'Edit' : 'New'} ${rc ? 'recipe' : 'stack'}</h2>${inFuel ? `<button class="x" onclick="B=newB();STACK_BUILD_OPEN=false;go('fuel')">✕</button>` : ''}</div><div class="g2 f"><div><label>Name</label><input value="${esc(B.n)}" oninput="B.n=this.value" placeholder="${rc ? 'Salmon rice bowl' : 'Recovery stack'}"></div><div><label>${rc ? 'Servings' : 'Time'}</label>${rc ? `<input type="number" inputmode="decimal" value="${B.sv || 1}" oninput="B.sv=+this.value||1">` : `<input type="time" value="${B.t}" oninput="B.t=this.value">`}</div></div><div class="f"><label>Category</label><select onchange="B.cat=this.value;go('${dest}')">${CATS.map(c => `<option ${c == B.cat ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="mu" style="margin-bottom:8px">Nutrition fills in as you type each ingredient. Edit any number.</div>
-${B.items.map((x, i) => `<div class="it"><div class="row f"><input placeholder="e.g. 120g cooked salmon" value="${esc(x.d)}" oninput="B.items[${i}].d=this.value;B.items[${i}].m||dbn('i${i}',()=>iAuto(${i}))"><button class="x" onclick="rmI(${i})">✕</button></div><div class="row f"><button class="q" id="ie${i}" onclick="iEst(${i})">Auto-fill</button><button class="q" onclick="scan(${i})">Scan barcode</button></div><div class="g5">${[['k', 'kcal'], ['p', 'P g'], ['c', 'C g'], ['f', 'F g'], ['sg', 'Sug g']].map(([k, l]) => `<div><label>${l}</label><input id="b${i}${k}" type="number" inputmode="decimal" value="${x[k] || ''}" oninput="B.items[${i}].${k}=+this.value||0;B.items[${i}].m=1;bt()"></div>`).join('')}</div></div>`).join('')}
-<button class="btn ghost" onclick="B.items.push({d:'',k:0,p:0,c:0,f:0,fi:0,sg:0,w:0});go('${dest}')">+ Add ingredient</button><div id="bt" class="mu" style="margin:10px 0">${btxt()}</div><label class="row" style="cursor:pointer;margin:4px 0 12px;user-select:none;font-weight:600;font-size:14px;color:var(--tx)"><input type="checkbox" ${B.fav ? 'checked' : ''} onchange="B.fav=this.checked" style="width:18px;height:18px;margin:0 8px 0 0;accent-color:#ffa51f">★ Mark stack as favourite</label><button class="btn" onclick="saveB()">Save ${rc ? 'recipe' : 'stack'}</button></div>` : ''}`;
+      ${showBuilder ? `<div id="sbuild" class="card" style="--c:#ffa51f"><div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><h2 style="margin:0">${B.id ? 'Edit' : 'New'} ${rc ? 'recipe' : 'stack'}</h2>${inFuel ? `<button class="x" onclick="B=newB();STACK_BUILD_OPEN=false;go('fuel')">✕</button>` : ''}</div><div class="g2 f"><div><label>Name</label><input value="${esc(B.n)}" oninput="B.n=this.value" placeholder="${rc ? 'Salmon rice bowl' : 'Recovery stack'}"></div><div><label>${rc ? 'Servings' : 'Time'}</label>${rc ? `<input type="number" inputmode="decimal" value="${B.sv || 1}" oninput="B.sv=+this.value||1">` : `<input type="time" value="${B.t}" oninput="B.t=this.value">`}</div></div><div class="f"><label>Category</label><select onchange="B.cat=this.value;go('${dest}')">${CATS.map(c => `<option ${c == B.cat ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="mu" style="margin-bottom:8px">Enter ingredient &amp; amount — nutrition fills in automatically.</div>
+${B.items.map((x, i) => `<div class="it"><div style="display:grid;grid-template-columns:1.5fr 1fr auto;gap:6px;align-items:end;margin-bottom:8px"><div><label>Ingredient</label><input placeholder="e.g. cooked salmon" value="${esc(x.d)}" oninput="B.items[${i}].d=this.value;B.items[${i}]._base=null;B.items[${i}].m||dbn('i${i}',()=>iAuto(${i}))"></div><div><label>Amount</label><input placeholder="e.g. 150g, 2 oz" value="${esc(x.amt || '')}" oninput="onStackAmt(${i},this.value)"></div><button class="x" style="padding:8px" onclick="rmI(${i})">✕</button></div><div class="row f"><button class="q" id="ie${i}" onclick="iEst(${i})">Auto-fill</button><button class="q" onclick="scan(${i})">Scan barcode</button></div><div class="g5">${[['k', 'kcal'], ['p', 'P g'], ['c', 'C g'], ['f', 'F g'], ['sg', 'Sug g']].map(([k, l]) => `<div><label>${l}</label><input id="b${i}${k}" type="number" inputmode="decimal" value="${x[k] || ''}" oninput="B.items[${i}].${k}=+this.value||0;B.items[${i}].m=1;bt()"></div>`).join('')}</div></div>`).join('')}
+<button class="btn ghost" onclick="B.items.push({d:'',amt:'',k:0,p:0,c:0,f:0,fi:0,sg:0,w:0});go('${dest}')">+ Add ingredient</button><div id="bt" class="mu" style="margin:10px 0">${btxt()}</div><label class="row" style="cursor:pointer;margin:4px 0 12px;user-select:none;font-weight:600;font-size:14px;color:var(--tx)"><input type="checkbox" ${B.fav ? 'checked' : ''} onchange="B.fav=this.checked" style="width:18px;height:18px;margin:0 8px 0 0;accent-color:#ffa51f">★ Mark stack as favourite</label><button class="btn" onclick="saveB()">Save ${rc ? 'recipe' : 'stack'}</button></div>` : ''}`;
     }
     V.fuel = function () {
       const T = day(Date.now()), t = T2(dayFood(T)), seen = {}, rec = [...S.food].sort((a, b) => b.ts - a.ts).filter(e => e.n != 'Water' && !seen[e.n] && (seen[e.n] = 1)).slice(0, 8);
-      return `<div class="card fp i3"><h2>Left today <small>${Math.max(0, S.t.kcal - Math.round(t.k))} kcal</small></h2><div class="g3 mu"><div><b style="color:var(--tx)">${Math.max(0, Math.round(S.t.p - t.p))}g</b> protein</div><div><b style="color:var(--tx)">${Math.max(0, Math.round(S.t.c - t.c))}g</b> carbs</div><div><b style="color:var(--tx)">${Math.max(0, Math.round(S.t.f - t.f))}g</b> fat</div></div></div>
+      const logBlock = `<div class="card fp i3"><h2>Left today <small>${Math.max(0, S.t.kcal - Math.round(t.k))} kcal</small></h2><div class="g3 mu"><div><b style="color:var(--tx)">${Math.max(0, Math.round(S.t.p - t.p))}g</b> protein</div><div><b style="color:var(--tx)">${Math.max(0, Math.round(S.t.c - t.c))}g</b> carbs</div><div><b style="color:var(--tx)">${Math.max(0, Math.round(S.t.f - t.f))}g</b> fat</div></div></div>
 ${rec.length ? `<div class="mu" style="margin:0 0 6px">Recent</div><div class="pills">${rec.map(e => `<button class="pill" onclick="again('${e.id}')">+ ${esc(e.n)}</button>`).join('')}</div>` : ''}
-<div class="card"><h2>Log food</h2><div style="display:grid;grid-template-columns:1.6fr 1fr;gap:8px;margin-bottom:10px"><div><label>Food or drink</label><input id="fn" autocomplete="off" placeholder="e.g. cooked salmon" oninput="SCAN_BASE=null;FAUTO=true;dbn('f',fEst)"></div><div><label>Amount</label><input id="fa" autocomplete="off" placeholder="e.g. 150g, 2 oz" oninput="onAmtInput()"></div></div><div class="row f"><button class="q" id="lb" onclick="fEst(1)">Auto-fill nutrition</button><button class="q" onclick="scan('f')">Scan barcode</button></div><div class="g3">${fld2('fk', 'kcal')}${fld2('fp', 'Protein g')}${fld2('fc', 'Carbs g')}</div><div class="g3" style="margin:10px 0">${fld2('ff', 'Fat g')}${fld2('fi', 'Fiber g')}${fld2('fs', 'Sugar g')}</div><div id="nd"></div><label class="row" style="cursor:pointer;margin:4px 0 12px;user-select:none;font-weight:600;font-size:14px;color:var(--tx)"><input type="checkbox" id="favchk" style="width:18px;height:18px;margin:0 8px 0 0;accent-color:#ffa51f">★ Mark as favourite</label><button class="btn" onclick="addFood()">Log food</button></div>
-${stacksSection(true)}`
+<div class="card"><h2>Log food</h2><div style="display:grid;grid-template-columns:1.6fr 1fr;gap:8px;margin-bottom:10px"><div><label>Food or drink</label><input id="fn" autocomplete="off" placeholder="e.g. cooked salmon" oninput="SCAN_BASE=null;FAUTO=true;dbn('f',fEst)"></div><div><label>Amount</label><input id="fa" autocomplete="off" placeholder="e.g. 150g, 2 oz" oninput="onAmtInput()"></div></div><div class="row f"><button class="q" id="lb" onclick="fEst(1)">Auto-fill nutrition</button><button class="q" onclick="scan('f')">Scan barcode</button></div><div class="g3">${fld2('fk', 'kcal')}${fld2('fp', 'Protein g')}${fld2('fc', 'Carbs g')}</div><div class="g3" style="margin:10px 0">${fld2('ff', 'Fat g')}${fld2('fi', 'Fiber g')}${fld2('fs', 'Sugar g')}</div><div id="nd"></div><label class="row" style="cursor:pointer;margin:4px 0 12px;user-select:none;font-weight:600;font-size:14px;color:var(--tx)"><input type="checkbox" id="favchk" style="width:18px;height:18px;margin:0 8px 0 0;accent-color:#ffa51f">★ Mark as favourite</label><button class="btn" onclick="addFood()">Log food</button></div>`;
+      return `<div class="d-two"><div>${logBlock}</div><div>${stacksSection(true)}</div></div>`;
     };
     const _td = V.today; V.today = function () {
       let h = _td();
       const allStacks = S.stacks || [],
             cur = allStacks.find(x => x.id === S.selStack) || allStacks.find(x => x.cat == 'Morning') || allStacks[0] || null,
             curF = cur && cur.cat == 'Recipes' ? 1 / (cur.sv || 1) : 1,
-            curTot = cur ? T2(cur.items) : null,
-            curLogged = cur ? S.food.some(e => isT(e) && e.n.startsWith(cur.n)) : false;
+            curTot = cur ? T2(cur.items) : null;
       const card = `<div class="card" style="--c:#ffa51f">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <div style="flex:1;min-width:0;cursor:pointer" onclick="toggleStackDrop()">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer" onclick="toggleStackDrop()">
+          <div style="flex:1;min-width:0">
             <h2 style="margin:0;font-size:20px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">${cur ? esc(cur.n) : 'Saved stacks'} <small>${cur ? (cur.cat == 'Recipes' ? '1 srv' : cur.t) : ''}</small></h2>
-            ${curTot ? `<div class="mu" style="font-size:12px;margin-top:2px">${Math.round(curTot.k * curF)} kcal · ${r1(curTot.p * curF)}P ${r1(curTot.c * curF)}C ${r1(curTot.f * curF)}F${curTot.sg ? ` · ${r1(curTot.sg * curF)}g sug` : ''}</div>` : '<div class="mu" style="font-size:12px">Tap ▼ to manage stacks</div>'}
+            ${curTot ? `<div class="mu" style="font-size:12px;margin-top:2px">${Math.round(curTot.k * curF)} kcal · ${r1(curTot.p * curF)}P ${r1(curTot.c * curF)}C ${r1(curTot.f * curF)}F${curTot.sg ? ` · ${r1(curTot.sg * curF)}g sug` : ''}</div>` : '<div class="mu" style="font-size:12px">Tap ▼ to view saved stacks</div>'}
           </div>
-          <div style="display:flex;align-items:center;gap:6px;flex:none">
-            ${cur ? `<button class="add" style="padding:5px 12px;font-size:13px" onclick="logStack('${cur.id}')">${curLogged ? 'Again' : 'Log'}</button>` : ''}
-            <button class="x" style="padding:5px 9px;font-size:12px;border:1px solid var(--ln);border-radius:8px;color:var(--tx);background:var(--s2)" onclick="toggleStackDrop()" title="Choose saved stack">${STACK_DROP_OPEN ? '▲' : '▼'}</button>
-          </div>
+          <button class="x" style="padding:6px 10px;font-size:13px;border:1px solid var(--ln);border-radius:8px;color:var(--tx);background:var(--s2)" onclick="event.stopPropagation();toggleStackDrop()" title="Expand saved stacks">${STACK_DROP_OPEN ? '▲' : '▼'}</button>
         </div>
         ${STACK_DROP_OPEN ? `<div style="margin-top:12px;border-top:1px solid var(--ln);padding-top:10px">
-          <div class="mu" style="font-size:12px;margin-bottom:6px">Choose a saved stack (${allStacks.length}):</div>
+          <div class="mu" style="font-size:12px;margin-bottom:6px">Saved stacks (${allStacks.length}):</div>
           ${allStacks.length ? allStacks.map(x => { const t = T2(x.items), f = x.cat == 'Recipes' ? 1 / (x.sv || 1) : 1, d = S.food.some(e => isT(e) && e.n.startsWith(x.n)), sel = cur && x.id === cur.id; return `<div class="li" style="padding:7px 6px;border-radius:8px;${sel ? 'background:rgba(255,165,31,.12);border:1px solid rgba(255,165,31,.35)' : ''}"><div style="flex:1;min-width:0;cursor:pointer" onclick="pickStack('${x.id}')"><b style="display:flex;align-items:center;gap:5px">${sel ? '<span style="color:#ffa51f">✓</span>' : ''}${esc(x.n)} <span class="mu" style="font-weight:500;font-size:11px">(${x.cat})</span></b><span class="mu">${Math.round(t.k * f)} kcal · ${r1(t.p * f)}P ${r1(t.c * f)}C ${r1(t.f * f)}F</span></div><button class="x" style="color:${x.fav ? '#ffa51f' : 'var(--mu)'};font-size:15px" title="${x.fav ? 'In favourites' : 'Save stack to favourites'}" onclick="toggleStackFav('${x.id}')">★</button><button class="add" onclick="logStack('${x.id}')">${d ? 'Again' : 'Log'}</button><button class="x" onclick="editS('${x.id}')">✎</button></div>` }).join('') : '<div class="mu">No saved stacks yet.</div>'}
           <button class="btn ghost" style="margin-top:10px" onclick="STACK_BUILD_OPEN=true;go('fuel')">Add or edit stacks</button>
         </div>` : ''}
@@ -1811,11 +2127,12 @@ ${stacksSection(true)}`
       const favStackHTML = favStacks.map(x => { const t = T2(x.items), f = x.cat == 'Recipes' ? 1 / (x.sv || 1) : 1, d = S.food.some(e => isT(e) && e.n.startsWith(x.n)); return `<div class="li"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;background:rgba(255,165,31,.18);color:#ffa51f;padding:1px 5px;border-radius:4px;font-weight:700">STACK</span><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.n)}</b></div><span class="mu">${Math.round(t.k * f)} kcal · ${r1(t.p * f)}P ${r1(t.c * f)}C ${r1(t.f * f)}F${t.sg ? ` · ${r1(t.sg * f)}g sug` : ''}</span></div><button class="add" onclick="logStack('${x.id}')">${d ? 'Again' : 'Log'}</button><button class="x" title="Remove stack from favourites" onclick="toggleStackFav('${x.id}')">✕</button></div>` }).join('');
       const favFoodHTML = favs.map(f => { const d = dayFood(day(Date.now())).some(e => (e.n || '').toLowerCase().trim() === (f.n || '').toLowerCase().trim()); return `<div class="li"><div style="flex:1;min-width:0"><b>${esc(f.n)}</b><span class="mu">${Math.round(f.k)} kcal · ${r1(f.p)}P ${r1(f.c)}C ${r1(f.f)}F${f.sg ? ` · ${r1(f.sg)}g sug` : ''}</span></div><button class="add" onclick="logFav('${f.id}')">${d ? 'Again' : 'Log'}</button><button class="x" title="Remove favourite" onclick="delFav('${f.id}')">✕</button></div>` }).join('');
       const fcard = `<div class="card fp i3" style="--c:#19e0b0"><h2>Favourites <small>${totalFavs} items</small></h2>${totalFavs ? favStackHTML + favFoodHTML : '<div class="mu">No favourites yet. Mark a food or stack with ★ in Fuel.</div>'}</div>`;
-      return h.replace(/<div class="card" style="--c:#19e0b0"><h2>For your remission[\s\S]*?<\/div><\/div>/, card + fcard).replace('hero fp i1', 'hero fp i4');
+      const leftCol = h.replace(/<div class="card" style="--c:#19e0b0"><h2>For your remission[\s\S]*?<\/div><\/div>/, card + fcard).replace('hero fp i1', 'hero fp i4');
+      return `<div class="d-bento"><div>${leftCol}</div><div class="d-only">${marketsTile(false)}${lifestyleTile(false)}</div></div>`;
     };
     function logStack(id) { const s = S.stacks.find(x => x.id == id), t = T2(s.items), f = s.cat == 'Recipes' ? 1 / (s.sv || 1) : 1; S.food.push({ id: uid(), ts: nowT(), n: s.n + (f < 1 ? ' (1 serving)' : ''), k: r1(t.k * f), p: r1(t.p * f), c: r1(t.c * f), f: r1(t.f * f), fi: r1(t.fi * f), sg: r1(t.sg * f), w: Math.round(t.w * f), mi: mul(t.mi, f), am: mul(t.am, f) }); save(); toast(s.n + ' logged'); go() }
     V.stacks = function () { return stacksSection(false) };
-    async function iAuto(i) { const x = B.items[i]; if (!x || x.m || x.d.trim().length < 3) return; try { const r = await aiFood(x.d); if (x.m) return; Object.assign(x, { k: r1(+r.k || 0), p: r1(+r.p || 0), c: r1(+r.c || 0), f: r1(+r.f || 0), fi: r1(+r.fi || 0), sg: r1(+r.sg || 0), w: Math.round(+r.w || 0), mi: r.mi || {}, am: r.am || {} });['k', 'p', 'c', 'f', 'sg'].forEach(k => { const el = $('#b' + i + k); if (el) el.value = x[k] || '' }); bt() } catch (e) { } }
+    async function iAuto(i) { const x = B.items[i]; if (!x || x.m || x.d.trim().length < 2) return; try { const q = [x.amt, x.d].filter(Boolean).join(' ').trim(); const r = await aiFood(q); if (x.m) return; Object.assign(x, { k: r1(+r.k || 0), p: r1(+r.p || 0), c: r1(+r.c || 0), f: r1(+r.f || 0), fi: r1(+r.fi || 0), sg: r1(+r.sg || 0), w: Math.round(+r.w || 0), mi: r.mi || {}, am: r.am || {} });['k', 'p', 'c', 'f', 'sg'].forEach(k => { const el = $('#b' + i + k); if (el) el.value = x[k] || '' }); bt() } catch (e) { } }
     async function iEst(i) { const x = B.items[i]; if (!x.d.trim()) return toast('Describe the ingredient'); x.m = 0; $('#ie' + i).textContent = '…'; await iAuto(i); const el = $('#ie' + i); if (el) el.textContent = 'Auto-fill' }
     const pu = x => { const c = x.mg / x.bac, dm = x.unit == 'mcg' ? x.dose / 1000 : x.dose; return c > 0 && isFinite(c) ? dm / c * 100 : 0 }, pnew = () => ({ n: '', mg: 10, bac: 2, dose: 250, unit: 'mcg' }), pfg = n => { const p = pepFind(n); return p && p[2] == 2 ? '⚠ Flagged for your remission' : p && p[2] == 1 ? 'Caution: discuss first' : '' };
     function pfl(i) { const e = $('#pf' + i); if (e) e.textContent = pfg(PB.items[i].n) }
@@ -1867,6 +2184,226 @@ ${stacksSection(true)}`
       sec('Daily log'); tb(['Date', 'Calories', 'Protein g', 'Carbs g', 'Fat g', 'Water ml', 'Burn'].slice(0, 7), R.days.map((k, i) => [k, r0(R.ds[i].k), r1(R.ds[i].p), r1(R.ds[i].c), r1(R.ds[i].f), r0(R.ds[i].w), r0(R.bn[i])]).filter(r => r[1] || r[5] || r[6]), [42, 200, 280, 360, 430, 500, 560]);
       foot(); const blob = d.output('blob'), fn = `All-In-Report-${R.a}-to-${R.b}.pdf`; try { const dl = window.claude && await claude.use('downloads'); if (!dl) throw 0; await dl.save({ filename: fn, data: blob }); toast('PDF ready') } catch (e) { try { d.save(fn); toast('PDF downloaded') } catch (x) { toast('Couldn’t save the PDF here') } }
     }
+    /* ===== Desktop Command Center: Markets, Live Yahoo Ticker & Men's Lifestyle ===== */
+    const SUGGESTED_SOURCES = [
+      { n: "Men's Health", cat: 'Health', url: 'https://www.menshealth.com/rss/all.xml/' },
+      { n: 'Car and Driver', cat: 'Cars', url: 'https://www.caranddriver.com/rss/all.xml/' },
+      { n: 'GQ Lifestyle', cat: 'Lifestyle', url: 'https://www.gq.com/feed/rss' },
+      { n: 'Gear Patrol', cat: 'Cars & Gear', url: 'https://www.gearpatrol.com/rss/all.xml/' },
+      { n: 'Healthline Nutrition', cat: 'Nutrition', url: 'https://www.healthline.com/rss/nutrition' },
+      { n: 'Art of Manliness', cat: 'Lifestyle', url: 'https://www.artofmanliness.com/feed/' },
+      { n: 'MotorTrend', cat: 'Cars', url: 'https://www.motortrend.com/feed/' },
+      { n: 'Robb Report', cat: 'Luxury', url: 'https://robbreport.com/feed/' }
+    ];
+    const LIFESTYLE_TIPS = [
+      { cat: 'Nutrition', title: 'Hit 35–45g Protein Per Meal', body: 'Spacing leucine-rich protein (salmon, lean steak, eggs, Greek yogurt) across 4 feedings maximizes muscle protein synthesis while preserving lean mass.' },
+      { cat: 'Men\'s Health', title: 'Zone 2 + Heavy Pulling', body: 'Pair 20–30 min of spin bike or stepper work with progressive back and core training 3–4×/week for cardiovascular resilience and a sharp V-taper.' },
+      { cat: 'Nutrition', title: 'Electrolytes Before Caffeine', body: 'Start with 750ml water + sodium/potassium/magnesium before your first coffee to stabilize morning energy, focus, and workout hydration.' },
+      { cat: 'Performance', title: 'Sleep Is Your #1 Anabolic Lever', body: '7.5–8.5 hours in a cool, dark room drives natural testosterone, recovery, and glucose control more than any supplement stack.' },
+      { cat: 'Nutrition', title: 'Keep Added Sugar Low, Fiber High', body: 'Aim for 30g+ fiber daily from berries, oats, greens, and avocado while tracking sugar grams to keep insulin sensitivity razor sharp.' },
+      { cat: 'Lifestyle', title: 'High-Performance Mindset', body: 'Treat your body like a flagship supercar: premium fuel, scheduled maintenance, consistent warm-ups, and zero skipped tune-ups.' }
+    ];
+    S.trades = S.trades || [];
+    S.lifestyleSources = Array.isArray(S.lifestyleSources) && S.lifestyleSources.length ? S.lifestyleSources : SUGGESTED_SOURCES.slice(0, 5);
+    let MKT = { quotes: {}, news: [], loading: false, ts: 0 };
+    let LIFE = { items: [], loading: false, ts: 0, filter: 'All' };
+    const DTABS = [
+      ['today', 'Command Center', 'M3 11l9-8 9 8M5 10v10h14V10'],
+      ['fuel', 'Fuel & Stacks', 'M7 3v7a2 2 0 002 2v9M11 3v7M15 3c-2 2-2 7 0 9v9'],
+      ['train', 'Train', 'M3 9v6M7 6v12M17 6v12M21 9v6M7 12h10'],
+      ['dose', 'Dose', 'M14 4l6 6M12 6l6 6-8 8H4v-6zM4 20l3-3'],
+      ['stats', 'Stats', 'M4 20V10M10 20V4M16 20v-8M22 20H2'],
+      ['markets', 'Markets & Trades', 'M3 17l6-6 4 4 8-8M14 7h7v7'],
+      ['lifestyle', "Men's Lifestyle", 'M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z']
+    ];
+    TT.markets = ['Markets & Portfolio', () => 'Live Yahoo Finance quotes, trades & news', 2];
+    TT.lifestyle = ["Men's Lifestyle", () => 'Performance cars, health, nutrition & curated feeds', 1];
+
+    async function fetchStocks(force) {
+      if (MKT.loading || (!force && Date.now() - MKT.ts < 60000 && Object.keys(MKT.quotes).length)) return;
+      MKT.loading = true;
+      const baseSyms = ['SPY', 'QQQ', 'NVDA', 'AAPL', 'TSLA', 'BTC-USD'];
+      const userSyms = (S.trades || []).map(t => t.sym.toUpperCase());
+      const syms = [...new Set([...userSyms, ...baseSyms])].slice(0, 16);
+      try {
+        const r = await fetch(`/api/feeds?type=stocks&symbols=${encodeURIComponent(syms.join(','))}`);
+        if (r.ok) {
+          const d = await r.json();
+          const map = {};
+          (d.quotes || []).forEach(q => { map[q.symbol.toUpperCase()] = q; });
+          MKT.quotes = map;
+          MKT.news = d.news || [];
+          MKT.ts = Date.now();
+        }
+      } catch (e) { }
+      MKT.loading = false;
+      renderTicker();
+      if (tab === 'today' || tab === 'markets') $('#v').innerHTML = ban() + (['today', 'stats', 'markets', 'lifestyle'].includes(tab) ? '' : ltb()) + V[tab]();
+    }
+
+    async function fetchLifestyle(force) {
+      if (LIFE.loading || (!force && Date.now() - LIFE.ts < 180000 && LIFE.items.length)) return;
+      LIFE.loading = true;
+      const sources = (S.lifestyleSources || []).slice(0, 5);
+      try {
+        const results = await Promise.all(sources.map(async src => {
+          try {
+            const r = await fetch(`/api/feeds?type=rss&url=${encodeURIComponent(src.url)}&name=${encodeURIComponent(src.n)}`);
+            if (!r.ok) return [];
+            const d = await r.json();
+            return (d.items || []).slice(0, 4).map(it => ({ ...it, source: src.n, cat: src.cat || 'Lifestyle' }));
+          } catch (e) { return [] }
+        }));
+        LIFE.items = results.flat().sort((a, b) => (new Date(b.pubDate).getTime() || 0) - (new Date(a.pubDate).getTime() || 0));
+        LIFE.ts = Date.now();
+      } catch (e) { }
+      LIFE.loading = false;
+      if (tab === 'today' || tab === 'lifestyle') $('#v').innerHTML = ban() + (['today', 'stats', 'markets', 'lifestyle'].includes(tab) ? '' : ltb()) + V[tab]();
+    }
+
+    function renderTicker() {
+      const el = $('#dtick'); if (!el) return;
+      const qList = Object.values(MKT.quotes || {});
+      const nList = (MKT.news || []).slice(0, 8);
+      const qHtml = qList.length ? qList.map(q => `<span class="tk-q"><b>${esc(q.symbol)}</b> $${q.price.toFixed(2)} <span class="${q.pct >= 0 ? 'tk-up' : 'tk-dn'}">${q.pct >= 0 ? '▲' : '▼'} ${Math.abs(q.pct).toFixed(2)}%</span></span>`).join('') : '<span class="mu">Loading live Yahoo Finance quotes…</span>';
+      const nHtml = nList.map(n => `<a class="tk-news" href="${esc(n.link)}" target="_blank" rel="noopener">📰 ${esc(n.title)}</a>`).join('');
+      const content = qHtml + (nHtml ? '<span style="color:var(--ln)">|</span>' + nHtml : '');
+      el.innerHTML = `<div class="dtick-lbl">YAHOO LIVE</div><div class="dtick-track">${content}<span style="color:var(--ln)">•</span>${content}</div>`;
+    }
+
+    function addTrade() {
+      const sym = val('tr_sym').trim().toUpperCase(), shares = +val('tr_sh') || 0, cost = +val('tr_pr') || 0;
+      if (!sym || shares <= 0 || cost <= 0) return toast('Enter ticker, shares, and buy price');
+      S.trades = S.trades || [];
+      S.trades.push({ id: uid(), sym, shares, cost, ts: Date.now() });
+      save(); toast(`Added ${shares} ${sym} @ $${cost}`);
+      fetchStocks(true);
+      go(tab);
+    }
+    function delTrade(id) { S.trades = (S.trades || []).filter(x => x.id != id); save(); toast('Trade removed'); go(tab) }
+
+    function addLifestyleSource() {
+      S.lifestyleSources = S.lifestyleSources || [];
+      if (S.lifestyleSources.length >= 5) return toast('Max 5 sources reached — remove one first');
+      const n = val('ls_name').trim(), url = val('ls_url').trim();
+      if (!n || !/^https?:\/\//i.test(url)) return toast('Enter source name and valid https:// RSS URL');
+      S.lifestyleSources.push({ n, cat: 'Custom', url });
+      save(); toast('Source added'); LIFE.ts = 0; fetchLifestyle(true); go(tab);
+    }
+    function addSuggestedSource(idx) {
+      S.lifestyleSources = S.lifestyleSources || [];
+      const src = SUGGESTED_SOURCES[idx]; if (!src) return;
+      if (S.lifestyleSources.some(s => s.url === src.url)) return toast(src.n + ' is already in your feed');
+      if (S.lifestyleSources.length >= 5) return toast('Max 5 sources — remove one first to add ' + src.n);
+      S.lifestyleSources.push({ ...src });
+      save(); toast('Added ' + src.n); LIFE.ts = 0; fetchLifestyle(true); go(tab);
+    }
+    function delLifestyleSource(idx) {
+      S.lifestyleSources = (S.lifestyleSources || []).filter((_, i) => i !== idx);
+      save(); toast('Source removed'); LIFE.ts = 0; fetchLifestyle(true); go(tab);
+    }
+
+    function marketsTile(fullView) {
+      const trades = S.trades || [];
+      let totalVal = 0, totalCost = 0;
+      const rows = trades.map(tr => {
+        const q = MKT.quotes[tr.sym.toUpperCase()];
+        const curP = q ? q.price : tr.cost;
+        const valNow = curP * tr.shares, costTot = tr.cost * tr.shares, pl = valNow - costTot, plPct = costTot > 0 ? (pl / costTot) * 100 : 0;
+        totalVal += valNow; totalCost += costTot;
+        return `<div class="stk-row"><div><b>${esc(tr.sym)}</b><div class="mu" style="font-size:11px">${tr.shares} sh @ $${tr.cost.toFixed(2)}</div></div><div>$${curP.toFixed(2)}</div><div class="${q && q.pct >= 0 ? 'tk-up' : 'tk-dn'}">${q ? `${q.pct >= 0 ? '+' : ''}${q.pct.toFixed(2)}%` : '–'}</div><div><b>$${valNow.toFixed(0)}</b></div><div class="${pl >= 0 ? 'tk-up' : 'tk-dn'}">${pl >= 0 ? '+' : ''}$${pl.toFixed(0)} (${plPct >= 0 ? '+' : ''}${plPct.toFixed(1)}%)</div><button class="x" onclick="delTrade('${tr.id}')">✕</button></div>`;
+      }).join('');
+      const totPl = totalVal - totalCost, totPct = totalCost > 0 ? (totPl / totalCost) * 100 : 0;
+      const newsItems = (MKT.news || []).slice(0, fullView ? 12 : 5);
+      return `<div class="card" style="--c:#19e0b0">
+        <div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Markets &amp; Portfolio <small>Yahoo Finance Live</small></h2><button class="q" style="flex:none;padding:5px 12px;font-size:12px" onclick="fetchStocks(true)">↻ Refresh</button></div>
+        <div class="g3" style="margin-bottom:12px;background:var(--s2);padding:10px 12px;border-radius:10px">
+          <div><div class="mu" style="font-size:11px">Portfolio Value</div><b style="font-size:18px">$${totalVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</b></div>
+          <div><div class="mu" style="font-size:11px">Cost Basis</div><b style="font-size:18px">$${totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</b></div>
+          <div><div class="mu" style="font-size:11px">Total P&amp;L</div><b style="font-size:18px" class="${totPl >= 0 ? 'tk-up' : 'tk-dn'}">${totPl >= 0 ? '+' : ''}$${totPl.toFixed(0)} (${totPct >= 0 ? '+' : ''}${totPct.toFixed(1)}%)</b></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:12px">
+          <div><label>Ticker</label><input id="tr_sym" placeholder="e.g. NVDA" style="text-transform:uppercase"></div>
+          <div><label>Shares</label><input id="tr_sh" type="number" inputmode="decimal" placeholder="10"></div>
+          <div><label>Buy Price $</label><input id="tr_pr" type="number" inputmode="decimal" placeholder="125.50"></div>
+          <button class="btn sm" style="padding:10px 14px" onclick="addTrade()">+ Trade</button>
+        </div>
+        ${trades.length ? `<div class="stk-row stk-hd"><span>Position</span><span>Live</span><span>Day</span><span>Value</span><span>P&amp;L</span><span></span></div>${rows}` : '<div class="mu" style="margin-bottom:12px">No trades added yet. Enter a ticker, shares, and buy price above to track live Yahoo P&amp;L.</div>'}
+        <div style="margin-top:14px;border-top:1px solid var(--ln);padding-top:10px">
+          <div class="mu" style="font-weight:700;margin-bottom:8px;color:var(--tx)">Latest Yahoo Finance News</div>
+          ${newsItems.length ? `<div class="art-list">${newsItems.map(n => `<a class="art-card" href="${esc(n.link)}" target="_blank" rel="noopener"><span class="mu" style="font-size:11px;color:#19e0b0">YAHOO FINANCE</span><b>${esc(n.title)}</b><span class="mu" style="font-size:11px">${n.pubDate ? new Date(n.pubDate).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span></a>`).join('')}</div>` : '<div class="mu">Loading latest Yahoo Finance headlines…</div>'}
+        </div>
+      </div>`;
+    }
+
+    function lifestyleTile(fullView) {
+      const sources = S.lifestyleSources || [];
+      const articles = (LIFE.items || []).slice(0, fullView ? 16 : 6);
+      const tips = LIFESTYLE_TIPS.slice(0, fullView ? 6 : 4);
+      return `<div class="card" style="--c:#ff6a00">
+        <div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Men's Lifestyle, Performance &amp; Nutrition <small>${sources.length}/5 sources</small></h2><button class="q" style="flex:none;padding:5px 12px;font-size:12px" onclick="fetchLifestyle(true)">↻ Refresh</button></div>
+        <div class="gal-grid">
+          <div class="gal-card" onclick="go('train')"><img src="/img/mens-health.jpg" alt="Men's Health & Strength"><div class="gal-cap">MEN'S HEALTH</div></div>
+          <div class="gal-card" onclick="go('lifestyle')"><img src="/img/supercar.jpg" alt="High-Performance Cars"><div class="gal-cap">HIGH-PERF CARS</div></div>
+          <div class="gal-card" onclick="go('lifestyle')"><img src="/img/lifestyle-glamour.jpg" alt="Luxury Lifestyle"><div class="gal-cap">LIFESTYLE</div></div>
+          <div class="gal-card" onclick="go('fuel')"><img src="/img/nutrition-hero.jpg" alt="Elite Nutrition"><div class="gal-cap">ELITE NUTRITION</div></div>
+        </div>
+        <div style="margin-bottom:10px">
+          <div class="mu" style="font-size:12px;margin-bottom:6px">Active Sources (${sources.length}/5 — click ✕ to remove):</div>
+          <div class="pills">${sources.map((s, i) => `<button class="pill on" onclick="delLifestyleSource(${i})" title="Remove source">${esc(s.n)} ✕</button>`).join('') || '<span class="mu">No sources added yet.</span>'}</div>
+          ${sources.length < 5 ? `<div style="display:grid;grid-template-columns:1fr 1.6fr auto;gap:8px;align-items:end;margin:8px 0">
+            <div><label>Source Name</label><input id="ls_name" placeholder="e.g. Muscle & Fitness"></div>
+            <div><label>RSS Feed URL</label><input id="ls_url" placeholder="https://.../rss"></div>
+            <button class="btn sm" style="padding:10px 14px" onclick="addLifestyleSource()">+ Add</button>
+          </div>` : ''}
+          <details style="margin-top:4px"><summary class="mu" style="font-size:12px"><b>Suggested Men's Lifestyle, Car &amp; Nutrition Feeds (one-click add)</b></summary>
+            <div class="pills" style="margin-top:8px">${SUGGESTED_SOURCES.map((s, i) => `<button class="pill ${sources.some(x => x.url === s.url) ? 'on' : ''}" onclick="addSuggestedSource(${i})">+ ${esc(s.n)} (${esc(s.cat)})</button>`).join('')}</div>
+          </details>
+        </div>
+        <div style="margin-top:12px;border-top:1px solid var(--ln);padding-top:10px">
+          <div class="mu" style="font-weight:700;margin-bottom:8px;color:var(--tx)">Live Lifestyle, Car &amp; Health Articles</div>
+          ${articles.length ? `<div class="art-list">${articles.map(a => `<a class="art-card" href="${esc(a.link)}" target="_blank" rel="noopener"><span class="mu" style="font-size:10.5px;color:#ff6a00;font-weight:700">${esc((a.source || 'FEED').toUpperCase())}</span><b>${esc(a.title)}</b>${a.summary ? `<div class="mu" style="font-size:11.5px;line-height:1.35">${esc(a.summary.slice(0, 110))}…</div>` : ''}</a>`).join('')}</div>` : '<div class="mu">Loading live articles from your sources…</div>'}
+        </div>
+        <div style="margin-top:14px;border-top:1px solid var(--ln);padding-top:10px">
+          <div class="mu" style="font-weight:700;margin-bottom:4px;color:var(--tx)">Health, Nutrition &amp; Performance Tips</div>
+          <div class="tip-grid">${tips.map(tp => `<div class="tip-card"><span class="mu" style="font-size:10.5px;color:#19e0b0;font-weight:700">${esc(tp.cat.toUpperCase())}</span><b>${esc(tp.title)}</b><div class="mu" style="font-size:12px;line-height:1.4">${esc(tp.body)}</div></div>`).join('')}</div>
+        </div>
+      </div>`;
+    }
+
+    V.markets = () => marketsTile(true);
+    V.lifestyle = () => lifestyleTile(true);
+
+    function renderDesktopSide() {
+      const el = $('#dside'); if (!el) return;
+      const t = T2(dayFood(day(Date.now())));
+      const macroBars = [[t.k, S.t.kcal, '#ffa51f', 'Calories', 'kcal'], [t.p, S.t.p, '#19e0b0', 'Protein', 'g'], [t.w, S.t.w, '#4aa8ff', 'Water', 'ml']]
+        .map(([v, m, c, n, u]) => `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px"><span class="mu">${n}</span><b>${Math.round(v)}/${m}${u}</b></div>${bar(v, m, c)}</div>`).join('');
+      el.innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:14px"><div class="logo">ALL<span>IN</span></div><button class="chip" style="padding:5px 10px;font-size:12px" onclick="sheet()">${S.syncUrl ? '☁️ ' : ''}${esc(S.name)}</button></div>
+        <div style="background:var(--s2);padding:10px 12px;border-radius:10px;margin-bottom:6px">${macroBars}</div>
+        <div class="dside-nav">${DTABS.map(x => `<a href="#${x[0]}" class="${x[0] == tab ? 'on' : ''}"><svg viewBox="0 0 24 24"><path d="${x[2]}"/></svg>${x[1]}</a>`).join('')}</div>
+        <div style="margin-top:auto;padding-top:12px;border-top:1px solid var(--ln);font-size:11.5px" class="mu">Desktop Command Center<br>${S.wt} lb · Target ${S.t.kcal} kcal</div>`;
+    }
+
+    const _goOrig = go;
+    go = function (t) {
+      if (t && location.hash != '#' + t) { location.hash = t; return }
+      const h = location.hash.slice(1);
+      const validTabs = [...TABS.map(x => x[0]), 'markets', 'lifestyle'];
+      tab = validTabs.includes(h) ? h : 'today';
+      document.body.dataset.tab = tab;
+      $('#hn').innerHTML = (S.syncUrl ? '<span id="cld" title="Cloud Sync" style="margin-right:4px">☁️</span>' : '') + esc(S.name);
+      hdr();
+      $('#nv').innerHTML = TABS.map(x => `<a href="#${x[0]}" class="${x[0] == tab ? 'on' : ''}"><svg viewBox="0 0 24 24"><path d="${x[2]}"/></svg>${x[1]}</a>`).join('');
+      $('#v').innerHTML = ban() + (['today', 'stats', 'markets', 'lifestyle'].includes(tab) ? '' : ltb()) + V[tab]();
+      renderDesktopSide();
+      renderTicker();
+      if (window.innerWidth >= 960 || tab === 'markets' || tab === 'lifestyle') {
+        fetchStocks(false);
+        fetchLifestyle(false);
+      }
+    };
+    window.addEventListener('resize', () => { if (window.innerWidth >= 960 && !MKT.ts) { fetchStocks(false); fetchLifestyle(false); } });
     save(); go();
   </script>
 </body>
