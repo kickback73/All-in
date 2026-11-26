@@ -117,7 +117,7 @@ const EX=[
  {n:'V-taper band pulls',g:'Bands',load:10,cue:'Pull wide, squeeze the lats, pause one second.'},
  {n:'Weighted rows',g:'Weights',load:20,cue:'Flat back. Elbow to hip.'},
  {n:'Core and plyo circuit',g:'Core',load:6,cue:'Crisp reps. Stop when form fades.'}];
-const DEF={t:{kcal:1900,p:180,c:140,f:65,fi:32,w:3250},name:'Dan',wt:229,food:[],train:[],dose:[],
+const DEF={t:{kcal:1900,p:180,c:140,f:65,fi:32,w:3250},name:'Dan',wt:229,food:[],train:[],dose:[],favs:[],syncUrl:'',lastSync:0,
  stacks:[{id:'s1',n:'Dan’s morning stack',cat:'Morning',t:'07:30',k:50,p:12.6,c:0,f:0,w:750,items:[
   {d:'750ml filtered water',k:0,p:0,c:0,f:0,fi:0,w:750,mi:{Ca:22.5,Mg:7.5,Na:15},am:{}},
   {d:'1 packet Organika electrolytes',k:0,p:0,c:0,f:0,fi:0,w:0,mi:{C:60,B6:0.2,B12:0.5,Ca:45,Mg:60,Zn:0.3,Ka:200,Na:440},am:{}},
@@ -126,7 +126,8 @@ const DEF={t:{kcal:1900,p:180,c:140,f:65,fi:32,w:3250},name:'Dan',wt:229,food:[]
  ]},{id:'s2',n:'Semax protocol stack',cat:'Morning',t:'07:30',k:0,p:0,c:0,f:0,w:0}],
  vial:{name:'Retatrutide',mg:10,bac:2,dose:3,unit:'mg',syr:100},weekly:{name:'Retatrutide',days:7}};
 let S;try{S=JSON.parse(localStorage.getItem(K))}catch(e){}S=Object.assign({},DEF,S||{});
-const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+const TM={},dbn=(k,f,ms)=>{clearTimeout(TM[k]);TM[k]=setTimeout(f,ms||900)};
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){};if(S.syncUrl)dbn('cloud_push',()=>pushCloud(true),1800)};
 let D={ex:0,sets:4,reps:12,rpe:7.5,load:8},SC='Morning',tab='today';
 const day=t=>new Date(t).toLocaleDateString('en-CA'),isT=e=>day(e.ts)===day(Date.now()),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const hm=t=>new Date(t).toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',hour12:false});
@@ -246,7 +247,7 @@ const ltb=()=>{const v=new Date(nowT()-new Date().getTimezoneOffset()*6e4).toISO
 function setLT(v){LTS=v?new Date(v).getTime():null;go()}
 function hdr(){const t=T2(dayFood(day(Date.now())));$('#hb').innerHTML=[[t.k,S.t.kcal,'#ffa51f','Calories'],[t.p,S.t.p,'#19e0b0','Protein'],[t.w,S.t.w,'#4aa8ff','Water']].map(([v,m,c,n])=>`<i title="${n} ${pct(v,m)}%"><b style="width:${pct(v,m)}%;background:${c}"></b></i>`).join('')}
 TABS.push(['stats','Stats','M4 20V10M10 20V4M16 20v-8M22 20H2']);
-function go(t){if(t&&location.hash!='#'+t){location.hash=t;return}const h=location.hash.slice(1);tab=TABS.some(x=>x[0]==h)?h:'today';document.body.dataset.tab=tab;$('#hn').textContent=S.name;hdr();$('#nv').innerHTML=TABS.map(x=>`<a href="#${x[0]}" class="${x[0]==tab?'on':''}"><svg viewBox="0 0 24 24"><path d="${x[2]}"/></svg>${x[1]}</a>`).join('');$('#v').innerHTML=ban()+(['today','stats'].includes(tab)?'':ltb())+V[tab]()}
+function go(t){if(t&&location.hash!='#'+t){location.hash=t;return}const h=location.hash.slice(1);tab=TABS.some(x=>x[0]==h)?h:'today';document.body.dataset.tab=tab;$('#hn').innerHTML=(S.syncUrl?'<span id="cld" title="Cloud Sync" style="margin-right:4px">☁️</span>':'')+esc(S.name);hdr();$('#nv').innerHTML=TABS.map(x=>`<a href="#${x[0]}" class="${x[0]==tab?'on':''}"><svg viewBox="0 0 24 24"><path d="${x[2]}"/></svg>${x[1]}</a>`).join('');$('#v').innerHTML=ban()+(['today','stats'].includes(tab)?'':ltb())+V[tab]()}
 V.today=function(){const t=T2(dayFood(day(Date.now()))),n=next(),r=readiness(),b=wd('Back'),a=wd('Abs'),i=Math.floor(Date.now()/864e5),h=new Date().getHours(),m=(l,v,x,c)=>`<div><div><span>${l}</span><b>${Math.round(v)}<span class="mu">/${x}g</span></b></div>${bar(v,x,c)}</div>`,wk=[...Array(7)].map((_,j)=>{const dt=Date.now()-(6-j)*864e5,k=day(dt);return `<div>${new Date(dt).toLocaleDateString('en-CA',{weekday:'narrow'})}<i class="${S.food.some(e=>day(e.ts)==k)?'f1':''} ${S.train.some(e=>day(e.ts)==k)?'f2':''}"></i></div>`}).join('');
 return `<div class="card hero fp i1" style="--c:#ffa51f">${ring(t.k,S.t.kcal,'#ffa51f',Math.max(0,S.t.kcal-Math.round(t.k)),'kcal left')}<div class="mac">${m('Protein',t.p,S.t.p,'#19e0b0')}${m('Carbs',t.c,S.t.c,'#ffa51f')}${m('Fat',t.f,S.t.f,'#bd78ff')}</div></div>
 <div class="mq">${MSG[(i+Math.floor(h/3))%MSG.length]}</div>
@@ -293,14 +294,149 @@ function st2(k,d,mn,mx){D2[k]=Math.min(mx,Math.max(mn,D2[k]+d));go('train')}
 function addTrain(){const e=X[D2.i];S.train.push({id:uid(),ts:nowT(),n:e[0],g:e[1],s:D2.sets,reps:D2.reps,u:UN[e[3]],rpe:D2.rpe,k:est2()});save();toast(`Logged ${est2()} kcal`);go('train')}
 const _dose=V.dose;V.dose=()=>`<div class="card" style="--c:#bd78ff"><h2>Search peptides</h2><div class="row"><input id="ps" placeholder="e.g. GHK-Cu, BPC-157, Semax" onkeydown="if(event.key=='Enter')pSearch()"><button class="btn sm" onclick="pSearch()">Search</button></div></div><div id="pr"></div>`+_dose();
 const _ad=addDose;addDose=function(){const p=pepFind(S.vial.name);if(p&&p[2]==2&&!confirm(p[0]+' is flagged for lymphoma remission. '+p[4]+' Log anyway?'))return;_ad()};
-function sheet(){const s=$('#sh'),t=S.t,p=S.pr,f=(i,l,v,ty)=>`<div><label>${l}</label><input id="${i}" type="${ty||'number'}" inputmode="decimal" value="${esc(v)}"></div>`;s.hidden=false;s.onclick=e=>{if(e.target==s)s.hidden=true};s.innerHTML=`<div><h2>Profile <small>Age ${age()}</small></h2><div class="g2 f">${f('sname','Name',S.name,'text')}${f('sdob','Date of birth',p.dob,'date')}</div><div class="g2 f">${f('swt','Weight lb',S.wt)}${f('sht','Height cm',p.ht||'')}</div><div class="f"><label>Medical conditions</label><input id="scond" value="${esc(p.cond)}"></div><div class="f"><label>Medications, allergies, notes</label><input id="snote" value="${esc(p.notes)}"></div><div class="f"><label>USDA API key (optional, works when you host the file yourself)</label><input id="sfdc" value="${esc(S.fdc||'')}"></div><h2>Daily targets</h2><div class="g3 f">${f('tk','kcal',t.kcal)}${f('tp','Protein g',t.p)}${f('tc','Carbs g',t.c)}</div><div class="g3 f">${f('tf','Fat g',t.f)}${f('tfi','Fiber g',t.fi)}${f('tw','Water ml',t.w)}</div><button class="btn" onclick="saveSet()">Save</button><button class="btn ghost" style="margin-top:8px" onclick="askNotif()">Turn on reminders</button><div class="mu" style="margin-top:8px">Reminders show every 3 hours while All In is open. A web page can’t notify you once it’s closed.</div><h2 style="margin-top:22px">Backup</h2><textarea id="bk" readonly>${JSON.stringify(S).replace(/</g,'&lt;')}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" onclick="$('#bk').select();document.execCommand('copy');toast('Copied')">Copy</button><button class="btn ghost sm" onclick="imp()">Paste to import</button></div></div>`}
-function saveSet(){S.name=val('sname')||'Athlete';S.pr={dob:val('sdob')||S.pr.dob,ht:num('sht'),cond:val('scond'),notes:val('snote')};S.wt=num('swt')||S.wt;S.fdc=(val('sfdc')||'').trim();S.t={kcal:num('tk'),p:num('tp'),c:num('tc'),f:num('tf'),fi:num('tfi'),w:num('tw')};save();$('#sh').hidden=true;go()}
+const APPS_SCRIPT = `function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("State") || ss.insertSheet("State");
+  var raw = sheet.getRange("A1").getValue();
+  var data = {};
+  try { data = raw ? JSON.parse(raw) : {}; } catch(err) { data = {}; }
+  return ContentService.createTextOutput(JSON.stringify({ success: true, data: data }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    var payload = JSON.parse(e.postData.contents);
+    var state = payload.state || payload;
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var stateSheet = ss.getSheetByName("State") || ss.insertSheet("State");
+    stateSheet.getRange("A1").setValue(JSON.stringify(state));
+    if (state.food && state.food.length) {
+      var foodSheet = ss.getSheetByName("Food Log") || ss.insertSheet("Food Log");
+      foodSheet.clearContents();
+      foodSheet.appendRow(["Date", "Time", "Item", "Calories", "Protein (g)", "Carbs (g)", "Fat (g)", "Fiber (g)", "Water (ml)"]);
+      state.food.slice().sort(function(a,b){ return b.ts - a.ts; }).forEach(function(f) {
+        var d = new Date(f.ts);
+        foodSheet.appendRow([d.toLocaleDateString(), d.toLocaleTimeString(), f.n||"", f.k||0, f.p||0, f.c||0, f.f||0, f.fi||0, f.w||0]);
+      });
+    }
+    if (state.train && state.train.length) {
+      var trainSheet = ss.getSheetByName("Training") || ss.insertSheet("Training");
+      trainSheet.clearContents();
+      trainSheet.appendRow(["Date", "Time", "Exercise", "Sets", "Reps/Duration", "RPE", "Burn (kcal)"]);
+      state.train.slice().sort(function(a,b){ return b.ts - a.ts; }).forEach(function(t) {
+        var d = new Date(t.ts);
+        trainSheet.appendRow([d.toLocaleDateString(), d.toLocaleTimeString(), t.n||"", t.s||0, (t.reps||0)+(t.u?" "+t.u:""), t.rpe||0, t.k||0]);
+      });
+    }
+    if (state.dose && state.dose.length) {
+      var doseSheet = ss.getSheetByName("Doses") || ss.insertSheet("Doses");
+      doseSheet.clearContents();
+      doseSheet.appendRow(["Date", "Time", "Compound", "Dose", "Unit", "Draw Units", "Site", "Stack"]);
+      state.dose.slice().sort(function(a,b){ return b.ts - a.ts; }).forEach(function(ds) {
+        var d = new Date(ds.ts);
+        doseSheet.appendRow([d.toLocaleDateString(), d.toLocaleTimeString(), ds.n||"", ds.d||0, ds.unit||"", ds.u?Number(ds.u).toFixed(1):0, ds.site||"", ds.stack||""]);
+      });
+    }
+    return ContentService.createTextOutput(JSON.stringify({ success: true, timestamp: new Date().toISOString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+
+async function pushCloud(silent){
+  if(!S.syncUrl) return;
+  const cld=$('#cld');
+  if(cld) cld.textContent='🔄';
+  try{
+    const r=await fetch('/api/sync',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url:S.syncUrl,state:S})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    S.lastSync=Date.now();
+    try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}
+    if(!silent) toast('Synced to Google Sheets ✓');
+    if(cld) cld.textContent='☁️';
+    const ss=$('#syncStatus');
+    if(ss) ss.textContent='Synced at '+new Date().toLocaleTimeString();
+  }catch(err){
+    if(cld) cld.textContent='⚠️';
+    if(!silent) toast('Sync failed: '+err.message);
+  }
+}
+
+async function pullCloud(manual){
+  if(!S.syncUrl){
+    if(manual) toast('Set your Google Apps Script URL first');
+    return;
+  }
+  const cld=$('#cld');
+  if(cld) cld.textContent='🔄';
+  if(manual) toast('Pulling from Google Sheets…',3000);
+  try{
+    const r=await fetch('/api/sync?url='+encodeURIComponent(S.syncUrl));
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const res=await r.json();
+    const cloud=res.data;
+    if(cloud && typeof cloud==='object' && (cloud.food || cloud.train || cloud.dose || cloud.stacks)){
+      const mergeArr=(local,remote)=>{
+        const map=new Map();
+        (local||[]).forEach(x=>map.set(x.id,x));
+        (remote||[]).forEach(x=>map.set(x.id,x));
+        return Array.from(map.values());
+      };
+      S.food=mergeArr(S.food,cloud.food);
+      S.train=mergeArr(S.train,cloud.train);
+      S.dose=mergeArr(S.dose,cloud.dose);
+      S.stacks=mergeArr(S.stacks,cloud.stacks);
+      S.favs=mergeArr(S.favs,cloud.favs);
+      if(cloud.t) S.t=Object.assign({},S.t,cloud.t);
+      if(cloud.pr) S.pr=Object.assign({},S.pr,cloud.pr);
+      if(cloud.wt) S.wt=cloud.wt;
+      if(cloud.name) S.name=cloud.name;
+      S.lastSync=Date.now();
+      try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}
+      if(cld) cld.textContent='☁️';
+      toast(manual?'Updated from Google Sheets ✓':'Synced with cloud ✓');
+      go();
+    } else if(manual){
+      toast('Sheet is currently empty. Syncing this device up…');
+      pushCloud(false);
+    }
+  }catch(err){
+    if(cld) cld.textContent='⚠️';
+    if(manual) toast('Pull failed: '+err.message);
+  }
+}
+
+function saveSyncUrl(){
+  const url=(val('ssync')||'').trim();
+  S.syncUrl=url;
+  save();
+  if(url){
+    pushCloud(false);
+  }else{
+    toast('Sync disabled');
+  }
+  go();
+}
+
+function sheet(){const s=$('#sh'),t=S.t,p=S.pr,f=(i,l,v,ty)=>`<div><label>${l}</label><input id="${i}" type="${ty||'number'}" inputmode="decimal" value="${esc(v)}"></div>`;s.hidden=false;s.onclick=e=>{if(e.target==s)s.hidden=true};s.innerHTML=`<div><h2>Profile <small>Age ${age()}</small></h2><div class="g2 f">${f('sname','Name',S.name,'text')}${f('sdob','Date of birth',p.dob,'date')}</div><div class="g2 f">${f('swt','Weight lb',S.wt)}${f('sht','Height cm',p.ht||'')}</div><div class="f"><label>Medical conditions</label><input id="scond" value="${esc(p.cond)}"></div><div class="f"><label>Medications, allergies, notes</label><input id="snote" value="${esc(p.notes)}"></div><div class="f"><label>USDA API key (optional, works when you host the file yourself)</label><input id="sfdc" value="${esc(S.fdc||'')}"></div><h2 style="margin-top:22px">Google Sheets Cloud Sync</h2><div class="f"><label>Google Apps Script Web App URL</label><input id="ssync" placeholder="https://script.google.com/macros/s/.../exec" value="${esc(S.syncUrl||'')}"></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="saveSyncUrl()">Save &amp; Sync</button><button class="btn ghost sm" onclick="pullCloud(1)">Pull from Sheet</button></div><div class="mu" id="syncStatus" style="margin-top:6px">${S.syncUrl?(S.lastSync?'Last synced: '+new Date(S.lastSync).toLocaleTimeString():'URL saved'):'Enter your Google Apps Script URL below to sync phone & laptop.'}</div><details style="margin-top:10px"><summary class="mu"><b>How to create your Google Sheets sync (Step-by-step)</b></summary><div class="mu" style="margin-top:8px;line-height:1.5">1. Open <b style="color:var(--tx)">sheets.new</b> in your browser.<br>2. Go to <b>Extensions &gt; Apps Script</b>.<br>3. Replace any code with the script below.<br>4. Click <b>Deploy &gt; New deployment</b>.<br>5. Select type: <b>Web app</b>.<br>6. Set <i>Execute as</i>: <b>Me</b>, and <i>Who has access</i>: <b>Anyone</b>.<br>7. Click <b>Deploy</b>, authorize your account, and copy the <b>Web app URL</b>.<br>8. Paste it above on your phone and laptop!</div><textarea readonly id="asc" style="margin-top:8px;height:120px">${esc(APPS_SCRIPT)}</textarea><div class="row" style="margin-top:6px"><button class="btn ghost sm" onclick="$('#asc').select();document.execCommand('copy');toast('Script copied')">Copy Apps Script code</button></div></details><h2 style="margin-top:22px">Daily targets</h2><div class="g3 f">${f('tk','kcal',t.kcal)}${f('tp','Protein g',t.p)}${f('tc','Carbs g',t.c)}</div><div class="g3 f">${f('tf','Fat g',t.f)}${f('tfi','Fiber g',t.fi)}${f('tw','Water ml',t.w)}</div><button class="btn" onclick="saveSet()">Save</button><button class="btn ghost" style="margin-top:8px" onclick="askNotif()">Turn on reminders</button><div class="mu" style="margin-top:8px">Reminders show every 3 hours while All In is open. A web page can’t notify you once it’s closed.</div><h2 style="margin-top:22px">Backup</h2><textarea id="bk" readonly>${JSON.stringify(S).replace(/</g,'&lt;')}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" onclick="$('#bk').select();document.execCommand('copy');toast('Copied')">Copy</button><button class="btn ghost sm" onclick="imp()">Paste to import</button></div></div>`}
+function saveSet(){S.name=val('sname')||'Athlete';S.pr={dob:val('sdob')||S.pr.dob,ht:num('sht'),cond:val('scond'),notes:val('snote')};S.wt=num('swt')||S.wt;S.fdc=(val('sfdc')||'').trim();S.syncUrl=(val('ssync')||'').trim();S.t={kcal:num('tk'),p:num('tp'),c:num('tc'),f:num('tf'),fi:num('tfi'),w:num('tw')};save();$('#sh').hidden=true;go()}
 function askNotif(){if(!('Notification' in window))return toast('Not supported here');Notification.requestPermission().then(r=>toast(r=='granted'?'Reminders on':'Reminders blocked'))}
 function ping(){const h=new Date().getHours();if(h<8||h>=21||Date.now()-S.lr<108e5)return;S.lr=Date.now();save();const m=MSG[Math.floor(Math.random()*MSG.length)]+' Time to move.';toast(m,6000);try{if(Notification.permission=='granted')new Notification('All In',{body:m})}catch(e){}}
-setInterval(ping,6e4);setTimeout(ping,4000);
+setInterval(ping,6e4);setTimeout(ping,4000);if(S.syncUrl)setTimeout(()=>pullCloud(false),1200);
 /* ===== v4 + Verified USDA & Open Food Facts UPC Engine ===== */
-let FAUTO=true,PB={n:'',items:[{n:'',mg:10,bac:2,dose:250,unit:'mcg'}]},SF=day(Date.now()-6*864e5),SE=day(Date.now());S.ps=S.ps||[];S.fdc=S.fdc||'';
-const TM={},dbn=(k,f,ms)=>{clearTimeout(TM[k]);TM[k]=setTimeout(f,ms||900)},mul=(o,f)=>{const r={};for(const k in o)r[k]=r1(o[k]*f);return r};
+let FAUTO=true,PB={n:'',items:[{n:'',mg:10,bac:2,dose:250,unit:'mcg'}]},SF=day(Date.now()-6*864e5),SE=day(Date.now());S.ps=S.ps||[];S.fdc=S.fdc||'';S.favs=S.favs||[];S.syncUrl=S.syncUrl||'';S.lastSync=S.lastSync||0;
+const isFav=n=>(S.favs||[]).some(f=>(f.n||'').toLowerCase().trim()===(n||'').toLowerCase().trim());
+function logFav(id){const f=(S.favs||[]).find(x=>x.id==id);if(!f)return;S.food.push({id:uid(),ts:nowT(),n:f.n,k:f.k,p:f.p,c:f.c,f:f.f,fi:f.fi||0,w:f.w||0,mi:f.mi||{},am:f.am||{}});save();toast('Logged '+f.n);go('today')}
+function delFav(id){S.favs=(S.favs||[]).filter(x=>x.id!=id);save();toast('Removed from favourites');go('today')}
+function toggleFav(foodId,fromHist){const e=S.food.find(x=>x.id==foodId);if(!e)return;S.favs=S.favs||[];const idx=S.favs.findIndex(f=>(f.n||'').toLowerCase().trim()===(e.n||'').toLowerCase().trim());if(idx>=0){S.favs.splice(idx,1);toast('Removed from favourites')}else{S.favs.push({id:uid(),n:e.n,k:e.k,p:e.p,c:e.c,f:e.f,fi:e.fi||0,w:e.w||0,mi:e.mi||{},am:e.am||{}});toast('★ Saved to favourites')}save();if(fromHist){openHistory(HIST_CAT)}else{go()}}
+const mul=(o,f)=>{const r={};for(const k in o)r[k]=r1(o[k]*f);return r};
 const FN={p:1003,f:1004,c:1005,fi:1079},FM={A:1106,C:1162,D:1114,E:1109,K:1185,B1:1165,B2:1166,B3:1167,B6:1175,B12:1178,Fol:1190,Ca:1087,Fe:1089,Mg:1090,Ka:1092,Zn:1095,Se:1103,Na:1093},FA={his:1221,ile:1212,leu:1213,lys:1214,thr:1211,trp:1210,val:1219};
 
 // Verified USDA FoodData Central Per-100g Reference Profiles (Macros + 18 Micros + 9 Essential Aminos in g/100g)
@@ -601,14 +737,14 @@ async function gotCode(c){
 const ndh=e=>{const m=MI.filter(x=>e.mi&&e.mi[x[0]]).map(x=>`${x[1]} ${r1(e.mi[x[0]])}${x[2]}`).join(' · '),a=AM.filter(x=>e.am&&e.am[x[0]]).map(x=>`${x[1]} ${r1(e.am[x[0]])}g`).join(' · ');return m||a?`<div class="nd"><b>Amino acids</b> ${a||'–'}<br><b>Micronutrients</b> ${m||'–'}</div>`:''};
 function fillF(u){ESTF={mi:u.mi||{},am:u.am||{}};const n=$('#fn');if(u.n!==undefined||u.d!==undefined)n.value=u.n||u.d||'';[['fk','k'],['fp','p'],['fc','c'],['ff','f'],['fi','fi'],['fw','w']].forEach(([i,k])=>$('#'+i).value=u[k]!==undefined&&u[k]!==''?u[k]:'');const nd=$('#nd');if(nd)nd.innerHTML=ndh(ESTF)}
 async function fEst(manual){const n=val('fn').trim();if(n.length<3){if(manual)toast('Type a food first');return}if(manual===1)FAUTO=true;if(!FAUTO)return;const b=$('#lb');if(b)b.textContent='Estimating…';try{const r=await aiFood(n);if(val('fn').trim()===n&&FAUTO){fillF(r);if(manual===1)toast('Auto-filled verified nutrition')}}catch(e){if(manual===1)toast('Auto-fill unavailable. Enter numbers.')}const b2=$('#lb');if(b2)b2.textContent='Auto-fill nutrition'}
-async function addFood(){const n=val('fn').trim(),e={id:uid(),ts:EDTS||nowT(),n:n||'Quick add',k:num('fk'),p:num('fp'),c:num('fc'),f:num('ff'),fi:num('fi'),w:num('fw'),mi:ESTF.mi||{},am:ESTF.am||{}};if(!n&&!e.k&&!e.p&&!e.w)return toast('Add a name or numbers');if(n&&!Object.keys(e.mi).length){toast('Looking up nutrition…',3000);try{const r=await aiFood(n);e.mi=r.mi||{};e.am=r.am||{};if(!e.k&&!e.p&&!e.c&&!e.f)Object.assign(e,{k:r1(+r.k||0),p:r1(+r.p||0),c:r1(+r.c||0),f:r1(+r.f||0),fi:r1(+r.fi||0),w:e.w||+r.w||0})}catch(x){}}S.food.push(e);if(PEND){S.upc[PEND]={...e};PEND=null}EDTS=null;ESTF={};save();toast('Logged');go('fuel')}
+async function addFood(){const n=val('fn').trim(),makeFav=$('#favchk')&&$('#favchk').checked,e={id:uid(),ts:EDTS||nowT(),n:n||'Quick add',k:num('fk'),p:num('fp'),c:num('fc'),f:num('ff'),fi:num('fi'),w:num('fw'),mi:ESTF.mi||{},am:ESTF.am||{}};if(!n&&!e.k&&!e.p&&!e.w)return toast('Add a name or numbers');if(n&&!Object.keys(e.mi).length){toast('Looking up nutrition…',3000);try{const r=await aiFood(n);e.mi=r.mi||{};e.am=r.am||{};if(!e.k&&!e.p&&!e.c&&!e.f)Object.assign(e,{k:r1(+r.k||0),p:r1(+r.p||0),c:r1(+r.c||0),f:r1(+r.f||0),fi:r1(+r.fi||0),w:e.w||+r.w||0})}catch(x){}}S.food.push(e);if(makeFav&&n){S.favs=S.favs||[];const idx=S.favs.findIndex(f=>(f.n||'').toLowerCase().trim()===n.toLowerCase().trim()),favObj={id:uid(),n:e.n,k:e.k,p:e.p,c:e.c,f:e.f,fi:e.fi,w:e.w,mi:e.mi,am:e.am};if(idx>=0)S.favs[idx]=favObj;else S.favs.push(favObj)}if(PEND){S.upc[PEND]={...e};PEND=null}EDTS=null;ESTF={};save();toast(makeFav?'Logged & saved to favourites ★':'Logged');go('fuel')}
 const fld2=(id,l)=>`<div><label>${l}</label><input id="${id}" type="number" inputmode="decimal" placeholder="0" oninput="FAUTO=false"></div>`;
 V.fuel=function(){const T=day(Date.now()),t=T2(dayFood(T)),L=dayFood(T).sort((a,b)=>b.ts-a.ts),seen={},rec=[...S.food].sort((a,b)=>b.ts-a.ts).filter(e=>e.n!='Water'&&!seen[e.n]&&(seen[e.n]=1)).slice(0,8);
 return `<div class="card fp i3"><h2>Left today <small>${Math.max(0,S.t.kcal-Math.round(t.k))} kcal</small></h2><div class="g3 mu"><div><b style="color:var(--tx)">${Math.max(0,Math.round(S.t.p-t.p))}g</b> protein</div><div><b style="color:var(--tx)">${Math.max(0,Math.round(S.t.c-t.c))}g</b> carbs</div><div><b style="color:var(--tx)">${Math.max(0,Math.round(S.t.f-t.f))}g</b> fat</div></div></div>
 ${rec.length?`<div class="mu" style="margin:0 0 6px">Recent</div><div class="pills">${rec.map(e=>`<button class="pill" onclick="again('${e.id}')">+ ${esc(e.n)}</button>`).join('')}</div>`:''}
-<div class="card"><h2>Log food</h2><div class="f"><label>Food or drink with amount</label><input id="fn" autocomplete="off" placeholder="e.g. 120g cooked salmon" oninput="FAUTO=true;dbn('f',fEst)"></div><div class="row f"><button class="q" id="lb" onclick="fEst(1)">Auto-fill nutrition</button><button class="q" onclick="scan('f')">Scan barcode</button></div><div class="g3">${fld2('fk','kcal')}${fld2('fp','Protein g')}${fld2('fc','Carbs g')}</div><div class="g3" style="margin:10px 0">${fld2('ff','Fat g')}${fld2('fi','Fiber g')}${fld2('fw','Water ml')}</div><div id="nd"></div><button class="btn" onclick="addFood()">Log food</button></div>
-<div class="card"><h2>Today <small>${L.length} items</small></h2>${L.length?L.map(e=>`<div class="li"><div><b>${esc(e.n)}</b><span class="mu">${hm(e.ts)} · ${Math.round(e.k)} kcal · ${r1(e.p)}P ${r1(e.c)}C ${r1(e.f)}F${e.w?` · ${e.w}ml`:''}</span></div><button class="x" onclick="editFood('${e.id}')">✎</button><button class="x" onclick="del('food','${e.id}')">✕</button></div>`).join(''):'<div class="mu">Nothing logged yet.</div>'}</div>`};
-const _td=V.today;V.today=function(){let h=_td();const ms=S.stacks.filter(x=>x.cat=='Morning'),card=`<div class="card" style="--c:#ffa51f"><h2>Morning stack <small>${ms.length?ms[0].t:''}</small></h2>${ms.length?ms.map(x=>{const t=T2(x.items),d=S.food.some(e=>isT(e)&&e.n==x.n);return `<div class="li"><div><b>${esc(x.n)}</b><span class="mu">${esc(x.items.map(i=>i.d).join(', ').slice(0,80))} · ${Math.round(t.k)} kcal · ${r1(t.p)}P</span></div><button class="add" onclick="logStack('${x.id}')">${d?'Again':'Log'}</button><button class="x" onclick="editS('${x.id}')">✎</button></div>`}).join(''):'<div class="mu">No morning stack yet.</div>'}<button class="btn ghost" style="margin-top:10px" onclick="SC='Morning';go('stacks')">Add or edit morning stacks</button></div>`;return h.replace(/<div class="card" style="--c:#19e0b0"><h2>For your remission[\s\S]*?<\/div><\/div>/,card).replace('hero fp i1','hero fp i4')};
+<div class="card"><h2>Log food</h2><div class="f"><label>Food or drink with amount</label><input id="fn" autocomplete="off" placeholder="e.g. 120g cooked salmon" oninput="FAUTO=true;dbn('f',fEst)"></div><div class="row f"><button class="q" id="lb" onclick="fEst(1)">Auto-fill nutrition</button><button class="q" onclick="scan('f')">Scan barcode</button></div><div class="g3">${fld2('fk','kcal')}${fld2('fp','Protein g')}${fld2('fc','Carbs g')}</div><div class="g3" style="margin:10px 0">${fld2('ff','Fat g')}${fld2('fi','Fiber g')}${fld2('fw','Water ml')}</div><div id="nd"></div><label class="row" style="cursor:pointer;margin:4px 0 12px;user-select:none;font-weight:600;font-size:14px;color:var(--tx)"><input type="checkbox" id="favchk" style="width:18px;height:18px;margin:0 8px 0 0;accent-color:#ffa51f">★ Mark as favourite</label><button class="btn" onclick="addFood()">Log food</button></div>
+<div class="card"><h2>Today <small>${L.length} items</small></h2>${L.length?L.map(e=>`<div class="li"><div style="flex:1;min-width:0"><b>${esc(e.n)}</b><span class="mu">${hm(e.ts)} · ${Math.round(e.k)} kcal · ${r1(e.p)}P ${r1(e.c)}C ${r1(e.f)}F${e.w?` · ${e.w}ml`:''}</span></div><button class="x" style="color:${isFav(e.n)?'#ffa51f':'var(--mu)'};font-size:16px" title="${isFav(e.n)?'In favourites':'Save to favourites'}" onclick="toggleFav('${e.id}')">★</button><button class="x" onclick="editFood('${e.id}')">✎</button><button class="x" onclick="del('food','${e.id}')">✕</button></div>`).join(''):'<div class="mu">Nothing logged yet.</div>'}</div>`};
+const _td=V.today;V.today=function(){let h=_td();const ms=S.stacks.filter(x=>x.cat=='Morning'),card=`<div class="card" style="--c:#ffa51f"><h2>Morning stack <small>${ms.length?ms[0].t:''}</small></h2>${ms.length?ms.map(x=>{const t=T2(x.items),d=S.food.some(e=>isT(e)&&e.n==x.n);return `<div class="li"><div><b>${esc(x.n)}</b><span class="mu">${esc(x.items.map(i=>i.d).join(', ').slice(0,80))} · ${Math.round(t.k)} kcal · ${r1(t.p)}P</span></div><button class="add" onclick="logStack('${x.id}')">${d?'Again':'Log'}</button><button class="x" onclick="editS('${x.id}')">✎</button></div>`}).join(''):'<div class="mu">No morning stack yet.</div>'}<button class="btn ghost" style="margin-top:10px" onclick="SC='Morning';go('stacks')">Add or edit morning stacks</button></div>`;const favs=S.favs||[],fcard=`<div class="card fp i3" style="--c:#19e0b0"><h2>Favourites <small>${favs.length} items</small></h2>${favs.length?favs.map(f=>{const d=dayFood(day(Date.now())).some(e=>(e.n||'').toLowerCase().trim()===(f.n||'').toLowerCase().trim());return `<div class="li"><div style="flex:1;min-width:0"><b>${esc(f.n)}</b><span class="mu">${Math.round(f.k)} kcal · ${r1(f.p)}P ${r1(f.c)}C ${r1(f.f)}F${f.w?` · ${f.w}ml`:''}</span></div><button class="add" onclick="logFav('${f.id}')">${d?'Again':'Log'}</button><button class="x" title="Remove favourite" onclick="delFav('${f.id}')">✕</button></div>`}).join(''):'<div class="mu">No favourite foods yet. Check "Mark as favourite" when logging in Fuel.</div>'}</div>`;return h.replace(/<div class="card" style="--c:#19e0b0"><h2>For your remission[\s\S]*?<\/div><\/div>/,card+fcard).replace('hero fp i1','hero fp i4')};
 function logStack(id){const s=S.stacks.find(x=>x.id==id),t=T2(s.items),f=s.cat=='Recipes'?1/(s.sv||1):1;S.food.push({id:uid(),ts:nowT(),n:s.n+(f<1?' (1 serving)':''),k:r1(t.k*f),p:r1(t.p*f),c:r1(t.c*f),f:r1(t.f*f),fi:r1(t.fi*f),w:Math.round(t.w*f),mi:mul(t.mi,f),am:mul(t.am,f)});save();toast(s.n+' logged');go()}
 V.stacks=function(){const L=S.stacks.filter(x=>x.cat==SC),rc=B.cat=='Recipes';return `<div class="pills">${CATS.map(c=>`<button class="pill ${c==SC?'on':''}" onclick="SC='${c}';B.cat=SC;go('stacks')">${c} (${S.stacks.filter(x=>x.cat==c).length})</button>`).join('')}</div>
 <div class="card fp i1" style="--c:#ffa51f">${L.length?L.map(x=>{const t=T2(x.items),f=x.cat=='Recipes'?1/(x.sv||1):1,d=S.food.some(e=>isT(e)&&e.n.startsWith(x.n));return `<div class="li" style="display:block"><div class="row"><div style="flex:1;min-width:0"><b>${esc(x.n)}</b><span class="mu">${f<1?'Per serving · ':x.t+' · '}${Math.round(t.k*f)} kcal · ${r1(t.p*f)}P ${r1(t.c*f)}C ${r1(t.f*f)}F</span></div><button class="add" onclick="logStack('${x.id}')">${d?'Again':'Log'}</button><button class="x" onclick="editS('${x.id}')">✎</button><button class="x" onclick="del('stacks','${x.id}')">✕</button></div><details><summary class="mu">${x.items.length} ingredient${x.items.length>1?'s':''}${f<1?' · '+x.sv+' servings':''}</summary>${x.items.map(i=>`<div class="mu" style="padding:3px 0"><b style="display:inline;color:var(--tx)">${esc(i.d)}</b>: ${Math.round(i.k)} kcal · ${r1(i.p)}P ${r1(i.c)}C ${r1(i.f)}F${i.w?` · ${i.w}ml`:''}</div>`).join('')}</details></div>`}).join(''):`<div class="mu">Nothing here yet. Build one below.</div>`}</div>
@@ -640,7 +776,10 @@ return `<div class="row f"><div style="flex:1"><label>From</label><input type="d
 <div class="card" style="--c:#19e0b0"><h2>Protein <small>target ${S.t.p}g</small></h2>${bars(sd.map(x=>x.p),lab,'#19e0b0',Math.max(S.t.p,...sd.map(x=>x.p)))}</div>
 <div class="card" style="--c:#4aa8ff"><h2>Water <small>target ${S.t.w}ml</small></h2>${bars(sd.map(x=>x.w),lab,'#4aa8ff',Math.max(S.t.w,...sd.map(x=>x.w)))}</div>
 <div class="card" style="--c:#7b88ff"><h2>Training burn <small>${R.bn.reduce((a,b)=>a+b,0)} kcal</small></h2>${bars(sb,lab,'#7b88ff')}</div>
-<div class="card"><h2>Entries <small>${L.length}</small></h2>${L.length?L.slice(0,80).map(e=>`<div class="li"><div><b>${esc(e.n)}</b><span class="mu">${day(e.ts)} ${hm(e.ts)} · ${Math.round(e.k)} kcal · ${r1(e.p)}P ${r1(e.c)}C ${r1(e.f)}F</span></div><button class="x" onclick="editFood('${e.id}')">✎</button><button class="x" onclick="del('food','${e.id}')">✕</button></div>`).join(''):'<div class="mu">Nothing logged in this range.</div>'}</div>`};
+<div class="card" style="--c:#29c5ff"><h2>Activity history <small>${L.length} entries</small></h2><div class="mu" style="margin-bottom:10px">Logged food, training, and doses for ${SF} to ${SE}.</div><button class="btn ghost" onclick="openHistory()">View &amp; edit activity history (${L.length})</button></div>`};
+let HIST_CAT='all';
+function openHistory(cat){if(cat)HIST_CAT=cat;const s=$('#sh');s.hidden=false;s.onclick=e=>{if(e.target==s)s.hidden=true};const inR=ts=>{const d=day(ts);return d>=SF&&d<=SE};const foodList=(S.food||[]).filter(e=>inR(e.ts)).map(e=>({...e,type:'food'}));const trainList=(S.train||[]).filter(e=>inR(e.ts)).map(e=>({...e,type:'train'}));const doseList=(S.dose||[]).filter(e=>inR(e.ts)).map(e=>({...e,type:'dose'}));const counts={all:foodList.length+trainList.length+doseList.length,food:foodList.length,train:trainList.length,dose:doseList.length};let list=[];if(HIST_CAT==='food')list=foodList;else if(HIST_CAT==='train')list=trainList;else if(HIST_CAT==='dose')list=doseList;else list=[...foodList,...trainList,...doseList];list.sort((a,b)=>b.ts-a.ts);s.innerHTML=`<div><div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><h2 style="margin:0">Activity history <small>${list.length} items</small></h2><button class="x" style="font-size:18px;padding:2px 8px" onclick="$('#sh').hidden=true">✕</button></div><div class="mu" style="margin-bottom:10px">Range: ${SF} to ${SE}</div><div class="pills" style="margin-bottom:12px"><button class="pill ${HIST_CAT==='all'?'on':''}" onclick="openHistory('all')">All (${counts.all})</button><button class="pill ${HIST_CAT==='food'?'on':''}" onclick="openHistory('food')">Food (${counts.food})</button><button class="pill ${HIST_CAT==='train'?'on':''}" onclick="openHistory('train')">Train (${counts.train})</button><button class="pill ${HIST_CAT==='dose'?'on':''}" onclick="openHistory('dose')">Dose (${counts.dose})</button></div><div style="max-height:60vh;overflow-y:auto;padding-right:2px">${list.length?list.map(item=>{if(item.type==='food'){const fav=isFav(item.n);return `<div class="li" style="padding:8px 0;border-bottom:1px solid var(--ln)"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;background:rgba(25,224,176,.15);color:#19e0b0;padding:2px 5px;border-radius:4px;font-weight:700">FOOD</span><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.n)}</b></div><span class="mu">${day(item.ts)} ${hm(item.ts)} · ${Math.round(item.k)} kcal · ${r1(item.p)}P ${r1(item.c)}C ${r1(item.f)}F${item.w?` · ${item.w}ml`:''}</span></div><button class="x" style="color:${fav?'#ffa51f':'var(--mu)'};font-size:16px;padding:4px 6px" title="${fav?'In favourites':'Add to favourites'}" onclick="toggleFav('${item.id}',true)">★</button><button class="x" style="font-size:15px;padding:4px 6px" title="Edit food" onclick="$('#sh').hidden=true;editFood('${item.id}')">✎</button><button class="x" style="font-size:15px;padding:4px 6px" title="Delete" onclick="delFromHist('food','${item.id}')">✕</button></div>`}else if(item.type==='train'){return `<div class="li" style="padding:8px 0;border-bottom:1px solid var(--ln)"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;background:rgba(123,136,255,.15);color:#7b88ff;padding:2px 5px;border-radius:4px;font-weight:700">TRAIN</span><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.n)}</b></div><span class="mu">${day(item.ts)} ${hm(item.ts)} · ${item.s}×${item.reps}${item.u?' '+item.u:''} · RPE ${item.rpe} · ${item.k} kcal</span></div><button class="x" style="font-size:15px;padding:4px 6px" title="Edit training" onclick="$('#sh').hidden=true;editTrain('${item.id}')">✎</button><button class="x" style="font-size:15px;padding:4px 6px" title="Delete" onclick="delFromHist('train','${item.id}')">✕</button></div>`}else if(item.type==='dose'){return `<div class="li" style="padding:8px 0;border-bottom:1px solid var(--ln)"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;background:rgba(189,120,255,.15);color:#bd78ff;padding:2px 5px;border-radius:4px;font-weight:700">DOSE</span><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.n)} · ${item.d}${item.unit}</b></div><span class="mu">${day(item.ts)} ${hm(item.ts)} · Draw ${r1(item.u)}U · ${item.site}</span></div><button class="x" style="font-size:15px;padding:4px 6px" title="Edit dose" onclick="$('#sh').hidden=true;editDose('${item.id}')">✎</button><button class="x" style="font-size:15px;padding:4px 6px" title="Delete" onclick="delFromHist('dose','${item.id}')">✕</button></div>`}}).join(''):'<div class="mu" style="padding:20px 0;text-align:center">No logged activities in this date range.</div>'}</div></div>`}
+function delFromHist(kind,id){S[kind]=(S[kind]||[]).filter(x=>x.id!=id);save();toast('Item deleted');openHistory(HIST_CAT);if(tab==='stats')go('stats')}
 async function backfill(){const R=RD(),L=S.food.filter(e=>e.n!='Water'&&!Object.keys(e.mi||{}).length&&R.days.includes(day(e.ts)));let i=0;for(const e of L){toast(`Filling ${++i}/${L.length}…`,2500);try{const r=await aiFood(e.n);e.mi=r.mi||{};e.am=r.am||{};if(!e.k&&!e.p&&!e.c&&!e.f)Object.assign(e,{k:r1(+r.k||0),p:r1(+r.p||0),c:r1(+r.c||0),f:r1(+r.f||0),fi:r1(+r.fi||0)})}catch(x){toast('Stopped: estimate unavailable');break}}save();go('stats')}
 async function pdf(){const J=window.jspdf;if(!J)return toast('PDF tool didn’t load');toast('Building PDF…',2500);const R=RD(),d=new J.jsPDF({unit:'pt',format:'letter'}),W=612,OR=[255,106,0],K=kg(),av=R.av;let y=96,pg=1;
 const T=(s,x,yy,sz,st,c,al)=>{d.setFont('helvetica',st||'normal');d.setFontSize(sz||10);d.setTextColor(...(c||[30,36,48]));d.text(String(s),x,yy,{align:al||'left'})};
