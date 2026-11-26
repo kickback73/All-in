@@ -711,8 +711,7 @@
     .card.fp {
       background-image: linear-gradient(0deg, color-mix(in srgb, var(--s1) 52%, transparent) 0%, color-mix(in srgb, var(--s1) 22%, transparent) 100%), var(--im);
       background-size: cover;
-      background-position: center 18%;
-      text-shadow: 0 1px 4px rgba(0, 0, 0, .65)
+      background-position: center 18%
     }
 
     .hb {
@@ -816,7 +815,7 @@
     }
 
     nav {
-      grid-template-columns: repeat(6, 1fr)
+      grid-template-columns: repeat(5, 1fr)
     }
 
     nav a {
@@ -888,11 +887,6 @@
 
     .ban::after {
       background: linear-gradient(90deg, color-mix(in srgb, var(--bg) 50%, transparent) 0%, color-mix(in srgb, var(--bg) 15%, transparent) 68%, transparent 100%)
-    }
-
-    .ban h1,
-    .ban p {
-      text-shadow: 0 1px 6px rgba(0, 0, 0, .75)
     }
 
     @keyframes trainGlow {
@@ -1105,7 +1099,7 @@
         toast('That JSON or URL isn’t valid');
       }
     }
-    const TABS = [['today', 'Today', 'M3 11l9-8 9 8M5 10v10h14V10'], ['fuel', 'Fuel', 'M7 3v7a2 2 0 002 2v9M11 3v7M15 3c-2 2-2 7 0 9v9'], ['train', 'Train', 'M3 9v6M7 6v12M17 6v12M21 9v6M7 12h10'], ['stacks', 'Stacks', 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5'], ['dose', 'Dose', 'M14 4l6 6M12 6l6 6-8 8H4v-6zM4 20l3-3']];
+    const TABS = [['today', 'Today', 'M3 11l9-8 9 8M5 10v10h14V10'], ['fuel', 'Fuel', 'M7 3v7a2 2 0 002 2v9M11 3v7M15 3c-2 2-2 7 0 9v9'], ['train', 'Train', 'M3 9v6M7 6v12M17 6v12M21 9v6M7 12h10'], ['dose', 'Dose', 'M14 4l6 6M12 6l6 6-8 8H4v-6zM4 20l3-3']];
     function go(t) {
       if (t && location.hash != '#' + t) { location.hash = t; return } const h = location.hash.slice(1); tab = TABS.some(x => x[0] == h) ? h : 'today'; document.body.dataset.tab = tab;
       $('#hn').textContent = `${S.name} · ${S.wt} lb`; $('#nv').innerHTML = TABS.map(x => `<a href="#${x[0]}" class="${x[0] == tab ? 'on' : ''}"><svg viewBox="0 0 24 24"><path d="${x[2]}"/></svg>${x[1]}</a>`).join(''); $('#v').innerHTML = V[tab]()
@@ -1211,10 +1205,10 @@ ${B.items.map((x, i) => `<div class="it"><div class="row f"><input placeholder="
 <button class="btn ghost" onclick="B.items.push({d:'',k:0,p:0,c:0,f:0,fi:0,w:0});go('stacks')">+ Add ingredient</button><div id="bt" class="mu" style="margin:10px 0">${btxt()}</div><button class="btn" onclick="saveB()">Save stack</button></div>`
     };
     const btxt = () => { const t = T2(B.items); return `Total: ${Math.round(t.k)} kcal · ${r1(t.p)}P ${r1(t.c)}C ${r1(t.f)}F${t.sg ? ` · ${r1(t.sg)}g sugar` : ''}${t.w ? ` · ${t.w}ml` : ''}` }, bt = () => { const e = $('#bt'); if (e) e.textContent = btxt() };
-    function rmI(i) { B.items.splice(i, 1); if (!B.items.length) B.items.push({ d: '', k: 0, p: 0, c: 0, f: 0, fi: 0, sg: 0, w: 0 }); go(tab === 'fuel' ? 'fuel' : 'stacks') }
-    async function iEst(i) { const x = B.items[i]; if (!x.d.trim()) return toast('Describe the ingredient'); $('#ie' + i).textContent = '…'; try { const r = await aiFood(x.d); Object.assign(x, { k: r1(+r.k || 0), p: r1(+r.p || 0), c: r1(+r.c || 0), f: r1(+r.f || 0), fi: r1(+r.fi || 0), sg: r1(+r.sg || 0), w: +r.w || 0, mi: r.mi || {}, am: r.am || {} }); toast('Auto-filled. Edit any number.') } catch (e) { toast('Auto-fill unavailable. Enter numbers.') } go(tab === 'fuel' ? 'fuel' : 'stacks') }
-    function saveB() { const items = B.items.filter(x => x.d.trim()); if (!B.n.trim() || !items.length) return toast('Add a name and an ingredient'); items.forEach(x => { if (x.u) S.upc[x.u] = { ...x, n: x.d } }); const tt = T2(items), o = { ...B, id: B.id || uid(), fav: !!B.fav, items, k: Math.round(tt.k), p: r1(tt.p), sg: r1(tt.sg), w: tt.w }; S.stacks = S.stacks.filter(x => x.id != o.id).concat(o); SC = o.cat; B = newB(); STACK_BUILD_OPEN = false; save(); toast(o.fav ? 'Stack saved & favourited ★' : 'Stack saved'); go(tab === 'fuel' ? 'fuel' : 'stacks') }
-    function editS(id) { B = JSON.parse(JSON.stringify(S.stacks.find(x => x.id == id))); SC = B.cat; STACK_BUILD_OPEN = true; const dest = tab === 'fuel' ? 'fuel' : 'stacks'; go(dest); setTimeout(() => { const el = $('#sbuild'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); else scrollTo(0, document.body.scrollHeight) }, 60) }
+    function rmI(i) { B.items.splice(i, 1); if (!B.items.length) B.items.push({ d: '', k: 0, p: 0, c: 0, f: 0, fi: 0, sg: 0, w: 0 }); go('fuel') }
+    async function iEst(i) { const x = B.items[i]; if (!x.d.trim()) return toast('Describe the ingredient'); $('#ie' + i).textContent = '…'; try { const r = await aiFood(x.d); Object.assign(x, { k: r1(+r.k || 0), p: r1(+r.p || 0), c: r1(+r.c || 0), f: r1(+r.f || 0), fi: r1(+r.fi || 0), sg: r1(+r.sg || 0), w: +r.w || 0, mi: r.mi || {}, am: r.am || {} }); toast('Auto-filled. Edit any number.') } catch (e) { toast('Auto-fill unavailable. Enter numbers.') } go('fuel') }
+    function saveB() { const items = B.items.filter(x => x.d.trim()); if (!B.n.trim() || !items.length) return toast('Add a name and an ingredient'); items.forEach(x => { if (x.u) S.upc[x.u] = { ...x, n: x.d } }); const tt = T2(items), o = { ...B, id: B.id || uid(), fav: !!B.fav, items, k: Math.round(tt.k), p: r1(tt.p), sg: r1(tt.sg), w: tt.w }; S.stacks = S.stacks.filter(x => x.id != o.id).concat(o); SC = o.cat; B = newB(); STACK_BUILD_OPEN = false; save(); toast(o.fav ? 'Stack saved & favourited ★' : 'Stack saved'); go('fuel') }
+    function editS(id) { B = JSON.parse(JSON.stringify(S.stacks.find(x => x.id == id))); SC = B.cat; STACK_BUILD_OPEN = true; go('fuel'); setTimeout(() => { const el = $('#sbuild'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); else scrollTo(0, document.body.scrollHeight) }, 60) }
     const est2 = () => { const e = X[D2.i] || X[0], isC = e[1] == 'Cardio' || e[3] == 'min', s = isC ? 1 : D2.sets, m = e[3] == 'rep' ? s * D2.reps * 4 / 60 : e[3] == 'time' ? s * D2.reps / 60 : s * D2.reps; return Math.round(e[4] * kg() * m / 60 * D2.rpe / 7) };
     const UN = { rep: 'reps', time: 'sec', min: 'min' };
     V.train = function () {
@@ -1729,7 +1723,7 @@ function doPost(e) {
         if (typeof SCX === 'number' && B.items[SCX]) B.items[SCX] = it;
         else if (B.items.length == 1 && !B.items[0].d) B.items[0] = it;
         else B.items.push(it);
-        go(tab === 'fuel' ? 'fuel' : 'stacks');
+        go('fuel');
         toast(u ? 'Added ' + it.d : `New barcode (${c}). Describe it, then Auto-fill.`, 3500);
       }
     }
@@ -1766,7 +1760,7 @@ function doPost(e) {
     async function addFood() { const n = val('fn').trim(), amt = val('fa').trim(), fullName = n ? (amt && !n.toLowerCase().includes(amt.toLowerCase()) ? `${n} (${amt})` : n) : (amt ? `Quick add (${amt})` : 'Quick add'), makeFav = $('#favchk') && $('#favchk').checked, e = { id: uid(), ts: EDTS || nowT(), n: fullName, k: num('fk'), p: num('fp'), c: num('fc'), f: num('ff'), fi: num('fi'), sg: num('fs'), w: ESTF.w || 0, mi: ESTF.mi || {}, am: ESTF.am || {} }; if (!n && !e.k && !e.p && !e.c && !e.f && !e.sg) return toast('Add a name or numbers'); if (n && !Object.keys(e.mi).length) { toast('Looking up nutrition…', 3000); try { const r = await aiFood(amt ? `${amt} ${n}` : n); e.mi = r.mi || {}; e.am = r.am || {}; if (!e.k && !e.p && !e.c && !e.f) Object.assign(e, { k: r1(+r.k || 0), p: r1(+r.p || 0), c: r1(+r.c || 0), f: r1(+r.f || 0), fi: r1(+r.fi || 0), sg: e.sg || r1(+r.sg || 0), w: e.w || +r.w || 0 }) } catch (x) { } } S.food.push(e); if (makeFav && n) { S.favs = S.favs || []; const idx = S.favs.findIndex(f => (f.n || '').toLowerCase().trim() === e.n.toLowerCase().trim()), favObj = { id: uid(), n: e.n, k: e.k, p: e.p, c: e.c, f: e.f, fi: e.fi, sg: e.sg, w: e.w, mi: e.mi, am: e.am }; if (idx >= 0) S.favs[idx] = favObj; else S.favs.push(favObj) } if (PEND) { S.upc[PEND] = { ...e }; PEND = null } EDTS = null; ESTF = {}; SCAN_BASE = null; save(); toast(makeFav ? 'Logged & saved to favourites ★' : 'Logged'); go('fuel') }
     const fld2 = (id, l) => `<div><label>${l}</label><input id="${id}" type="number" inputmode="decimal" placeholder="0" oninput="FAUTO=false"></div>`;
     function stacksSection(inFuel) {
-      const dest = inFuel ? 'fuel' : 'stacks';
+      const dest = 'fuel';
       const cats = ['All', ...CATS];
       if (!cats.includes(SC)) SC = 'All';
       const L = SC === 'All' ? S.stacks : S.stacks.filter(x => x.cat == SC);
